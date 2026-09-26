@@ -692,7 +692,7 @@ export function PropertiesPanel() {
             {node.data.provider !== "local" ? <label>Calendar connection<SpaghettiSelect ariaLabel="Calendar connection" value={node.data.provider_connection_id ?? ""} options={[{ value: "", label: "Choose calendar connection" }, ...connections.filter((item) => item.kind === node.data.provider && item.status === "active").map((item) => ({ value: item.id, label: item.name }))]} onChange={(connectionId) => updateNodeData(node.id, { provider_connection_id: connectionId || undefined })} /></label> : null}
             <div className="property-grid-two">
               <label>Duration (minutes)<input type="number" min={5} value={node.data.duration_minutes ?? 30} onChange={(event) => updateNodeData(node.id, { duration_minutes: optionalNumber(event.target.value) })} /></label>
-              <label>Timezone<input value={node.data.timezone ?? "UTC"} onChange={(event) => updateNodeData(node.id, { timezone: event.target.value })} /></label>
+              <label>Timezone override<input value={node.data.timezone ?? ""} placeholder="Use General setting" onChange={(event) => updateNodeData(node.id, { timezone: event.target.value || undefined })} /></label>
             </div>
             <div className="property-grid-two"><label>Opens at<input type="number" min={0} max={23} value={node.data.opening_hour ?? 9} onChange={(event) => updateNodeData(node.id, { opening_hour: optionalNumber(event.target.value) })} /></label><label>Closes at<input type="number" min={1} max={24} value={node.data.closing_hour ?? 17} onChange={(event) => updateNodeData(node.id, { closing_hour: optionalNumber(event.target.value) })} /></label></div>
           </fieldset>
@@ -924,6 +924,9 @@ export function PropertiesPanel() {
           <button
             className="danger-button"
             onClick={() => {
+              const readableType = node.type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+              const nodeLabel = `${readableType} node${node.data.node_number ? ` #${node.data.node_number}` : ""}`;
+              if (!window.confirm(`Delete ${nodeLabel}?\n\nThis action cannot be undone.`)) return;
               onNodesChange([{ id: node.id, type: "remove" }]);
               selectNode(null);
             }}

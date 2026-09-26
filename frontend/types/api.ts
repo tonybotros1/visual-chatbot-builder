@@ -1,4 +1,4 @@
-import type { FactSchema, FlowDocument, LinkAction } from "./flow";
+import type { FactSchema, FlowDocument, FlowSettings, LinkAction } from "./flow";
 
 export type User = {
   id: string;
@@ -91,6 +91,8 @@ export type ConversationState = {
     avatar_url?: string;
     layout_style?: "card" | "personal" | "modern" | "minimal";
   };
+  settings: Partial<FlowSettings>;
+  progress_percent: number;
 };
 
 export type ConversationRecord = {

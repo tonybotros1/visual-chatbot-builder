@@ -23,6 +23,7 @@ import {
   Save,
   Search,
   Send,
+  Settings2,
 } from "lucide-react";
 import { PropertiesPanel } from "@/components/properties/PropertiesPanel";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
@@ -34,6 +35,7 @@ import type { ValidationIssue } from "@/types/api";
 import type { BuilderNodeType, FlowDocument } from "@/types/flow";
 import { FlowCanvas } from "./FlowCanvas";
 import { DesignWorkspace } from "./DesignWorkspace";
+import { SettingsWorkspace } from "./SettingsWorkspace";
 
 type SaveState = "idle" | "loading" | "saving" | "saved" | "local" | "error";
 
@@ -97,7 +99,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const [message, setMessage] = useState("Loading draft…");
   const [botName, setBotName] = useState("Bot builder");
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
-  const [activeTab, setActiveTab] = useState<"questions" | "design">("questions");
+  const [activeTab, setActiveTab] = useState<"questions" | "design" | "settings">("questions");
 
   const loadDraft = useCallback(async () => {
     setSaveState("loading");
@@ -157,11 +159,10 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
     if (isDirty && !(await handleSave())) return;
     try {
       const report = await validateBot(botId);
-      const errors = report.issues.filter((issue) => issue.severity === "error");
       setValidationIssues(report.issues);
-      setMessage(report.valid ? `Flow is valid${report.issues.length ? ` (${report.issues.length} warnings)` : ""}` : `${errors.length} validation errors`);
+      setMessage(report.valid ? "All nodes are connected" : `${report.issues.length} unconnected ${report.issues.length === 1 ? "node" : "nodes"}`);
       setSaveState(report.valid ? "saved" : "error");
-      if (!report.valid && errors[0]?.node_ids[0]) selectNode(errors[0].node_ids[0]);
+      if (!report.valid && report.issues[0]?.node_ids[0]) selectNode(report.issues[0].node_ids[0]);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Validation failed");
       setSaveState("error");
@@ -203,7 +204,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
 
   return (
     <main
-      className={`builder-page${activeTab === "design" ? " is-design-mode" : ""}`}
+      className={`builder-page${activeTab === "design" ? " is-design-mode" : activeTab === "settings" ? " is-settings-mode" : ""}`}
       style={{
         "--builder-canvas-color": "#FFFFFF",
         "--builder-node-color": appearance.surface_color,
@@ -322,19 +323,29 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
         >
           <Palette size={16} /> Design
         </button>
+        <button
+          className={activeTab === "settings" ? "is-active" : ""}
+          type="button"
+          onClick={() => {
+            selectNode(null);
+            setActiveTab("settings");
+          }}
+        >
+          <Settings2 size={16} /> Settings
+        </button>
       </nav>
 
       {activeTab === "questions" && validationIssues.length ? (
-        <section className={`builder-validation ${validationIssues.some((issue) => issue.severity === "error") ? "has-errors" : "is-valid"}`} aria-live="polite">
+        <section className="builder-validation has-errors" aria-live="polite">
           <div>
-            <strong>{validationIssues.some((issue) => issue.severity === "error") ? "Flow needs attention" : "Flow is ready"}</strong>
-            <span>{validationIssues.filter((issue) => issue.severity === "error").length} errors · {validationIssues.filter((issue) => issue.severity === "warning").length} warnings</span>
+            <strong>Nodes need connections</strong>
+            <span>{validationIssues.length} unconnected {validationIssues.length === 1 ? "node" : "nodes"}</span>
           </div>
           <ul>
             {validationIssues.slice(0, 6).map((issue, index) => (
               <li key={`${issue.code}-${index}`}>
                 <button type="button" onClick={() => issue.node_ids[0] && selectNode(issue.node_ids[0])} disabled={!issue.node_ids[0]}>
-                  <span>{issue.severity}</span> {issue.message}
+                  <span>Connect</span> {issue.message}
                 </button>
               </li>
             ))}
@@ -349,8 +360,10 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
             <QuestionsWorkspace />
           </ReactFlowProvider>
         </div>
-      ) : (
+      ) : activeTab === "design" ? (
         <DesignWorkspace />
+      ) : (
+        <SettingsWorkspace botId={botId} />
       )}
     </main>
   );

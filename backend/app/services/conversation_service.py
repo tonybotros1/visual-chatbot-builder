@@ -33,6 +33,9 @@ def start_conversation(
     locale: str | None = None,
 ) -> ConversationState:
     flow = version.flow_json
+    flow_settings = flow.get("settings", {})
+    if flow_settings.get("enabled") is False and source != "preview":
+        raise EngineError("This chatbot is temporarily unavailable")
     start_nodes = [node for node in flow.get("nodes", []) if node.get("type") == "start"]
     if len(start_nodes) != 1:
         raise EngineError("Published flow must contain exactly one Start node")
@@ -55,7 +58,7 @@ def start_conversation(
         variables=result.variables,
         runtime_state=result.runtime_state,
         source=source,
-        context_data=metadata or {},
+        context_data=(metadata or {}) if flow_settings.get("collect_visitor_context", True) else {},
         tags=[],
         notes=[],
         completed_at=datetime.now(UTC) if result.completed else None,
@@ -64,7 +67,14 @@ def start_conversation(
     db.commit()
     db.refresh(conversation)
     enqueue_event(db, "conversation.completed" if result.completed else "conversation.started", conversation)
-    return _state(conversation, result.messages, result.next_node, flow.get("appearance", {}))
+    return _state(
+        conversation,
+        result.messages,
+        result.next_node,
+        flow.get("appearance", {}),
+        flow_settings,
+        _flow_progress(flow, result.next_node, result.completed),
+    )
 
 
 def submit_answer(
@@ -118,6 +128,8 @@ def submit_answer(
         result.messages,
         result.next_node,
         version.flow_json.get("appearance", {}),
+        version.flow_json.get("settings", {}),
+        _flow_progress(version.flow_json, result.next_node, result.completed),
     )
 
 
@@ -187,6 +199,8 @@ def _state(
     messages: list[dict[str, Any]],
     next_node: dict[str, Any] | None,
     appearance: dict[str, Any] | None = None,
+    settings: dict[str, Any] | None = None,
+    progress_percent: float = 0,
 ) -> ConversationState:
     return ConversationState(
         conversation_id=conversation.id,
@@ -201,4 +215,24 @@ def _state(
         locale=str((conversation.runtime_state or {}).get("locale") or "en"),
         direction=str((conversation.runtime_state or {}).get("direction") or "ltr"),
         appearance=appearance or {},
+        settings=settings or {},
+        progress_percent=progress_percent,
     )
+
+
+def _flow_progress(
+    flow: dict[str, Any],
+    next_node: dict[str, Any] | None,
+    completed: bool,
+) -> float:
+    if completed:
+        return 100
+    numbered_nodes = [
+        int(node.get("data", {}).get("node_number"))
+        for node in flow.get("nodes", [])
+        if str(node.get("data", {}).get("node_number", "")).isdigit()
+    ]
+    current_value = (next_node or {}).get("data", {}).get("node_number")
+    if not numbered_nodes or not str(current_value or "").isdigit():
+        return 0
+    return round(min(99, max(0, int(current_value) / max(numbered_nodes) * 100)), 1)

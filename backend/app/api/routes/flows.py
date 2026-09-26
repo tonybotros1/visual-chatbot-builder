@@ -10,7 +10,7 @@ from app.api.dependencies import get_current_user
 from app.api.routes.bots import owned_bot
 from app.database.session import get_db
 from app.engine.dependencies import validate_subflow_dependencies
-from app.engine.validator import validate_flow
+from app.engine.validator import validate_flow, validate_flow_connections
 from app.models.bot import Bot, BotVersion
 from app.models.subflow import BotVersionDependency
 from app.models.user import User
@@ -68,10 +68,9 @@ def validate_bot_flow(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ValidationReport:
-    bot = owned_bot(bot_id, user, db)
+    owned_bot(bot_id, user, db)
     draft = _get_draft(bot_id, user, db)
-    report = validate_flow(draft.flow_json)
-    return validate_subflow_dependencies(db, bot.user_id, draft.flow_json, report)
+    return validate_flow_connections(draft.flow_json)
 
 
 @router.get("/{bot_id}/versions", response_model=list[VersionRead])

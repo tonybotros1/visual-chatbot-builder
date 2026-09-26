@@ -38,21 +38,28 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
   const [value, setValue] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState("");
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [direction, setDirection] = useState<"ltr" | "rtl">("ltr");
   const [appearance, setAppearance] = useState<ConversationState["appearance"]>({});
+  const [runtimeSettings, setRuntimeSettings] = useState<ConversationState["settings"]>({});
+  const [progressPercent, setProgressPercent] = useState(0);
   const [otpChallengeId, setOtpChallengeId] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpDebugCode, setOtpDebugCode] = useState<string | null>(null);
   const automaticStartKey = useRef<string | null>(null);
+  const responseSequence = useRef(0);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   const begin = async () => {
+    const sequence = ++responseSequence.current;
     setBusy(true);
+    setIsTyping(false);
     setError("");
     setMessages([]);
     setNode(null);
+    setProgressPercent(0);
     setValue("");
     setSelected([]);
     setSlots([]);
@@ -67,12 +74,15 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
         token = bootstrap.eligibility_token;
       }
       const state = botId ? await startPreview(botId, locale) : deploymentKey ? await startDeployment(deploymentKey, locale, token ?? "") : await startPublic(identifier ?? "", locale);
+      if (sequence !== responseSequence.current) return;
       setConversationId(state.conversation_id);
-      applyState(state, []);
+      await applyState(state, [], sequence);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not start conversation");
+      if (sequence === responseSequence.current) {
+        setError(caught instanceof Error ? caught.message : "Could not start conversation");
+      }
     } finally {
-      setBusy(false);
+      if (sequence === responseSequence.current) setBusy(false);
     }
   };
 
@@ -95,9 +105,9 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
       transcript.scrollTo({ top: transcript.scrollHeight, behavior: "smooth" });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, node?.id, error]);
+  }, [messages, node?.id, error, isTyping]);
 
-  const applyState = (state: ConversationState, prefix: ChatMessage[]) => {
+  const applyState = async (state: ConversationState, prefix: ChatMessage[], sequence: number) => {
     const botMessages: ChatMessage[] = state.messages.map((item) => ({
       id: `${item.id}-${crypto.randomUUID()}`,
       sender: "bot",
@@ -112,10 +122,31 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
         node: state.next_node,
       });
     }
-    setMessages((current) => [...current, ...prefix, ...botMessages]);
-    setNode(state.status === "active" ? state.next_node : null);
+    if (prefix.length) setMessages((current) => [...current, ...prefix]);
+    setNode(null);
     setDirection(state.direction ?? "ltr");
     setAppearance(state.appearance ?? {});
+    setRuntimeSettings(state.settings ?? {});
+    setProgressPercent(state.progress_percent ?? 0);
+    const requestedDelay = Number(state.settings?.response_delay_seconds ?? 0);
+    const delayMilliseconds = Math.min(10, Math.max(0, Number.isFinite(requestedDelay) ? requestedDelay : 0)) * 1000;
+
+    if (delayMilliseconds === 0) {
+      if (sequence !== responseSequence.current) return;
+      setMessages((current) => [...current, ...botMessages]);
+    } else {
+      for (const message of botMessages) {
+        setIsTyping(true);
+        await new Promise((resolve) => window.setTimeout(resolve, delayMilliseconds));
+        if (sequence !== responseSequence.current) return;
+        setIsTyping(false);
+        setMessages((current) => [...current, message]);
+      }
+    }
+
+    if (sequence !== responseSequence.current) return;
+    setIsTyping(false);
+    setNode(state.status === "active" ? state.next_node : null);
     if (typeof window !== "undefined" && window.parent !== window) {
       window.parent.postMessage({ type: "visual-chatbot:event", event: state.status === "completed" ? "completed" : "state", payload: { conversation_id: state.conversation_id, status: state.status, variables: state.variables } }, "*");
     }
@@ -123,17 +154,22 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
 
   const submit = async (answer: unknown, displayValue = String(answer)) => {
     if (!conversationId || !node) return;
+    const sequence = ++responseSequence.current;
     setBusy(true);
+    setIsTyping(false);
     setError("");
     try {
       const state = await answerConversation(conversationId, node.id, answer);
-      applyState(state, [{ id: crypto.randomUUID(), sender: "user", text: displayValue }]);
+      if (sequence !== responseSequence.current) return;
+      await applyState(state, [{ id: crypto.randomUUID(), sender: "user", text: displayValue }], sequence);
       setValue("");
       setSelected([]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not submit answer");
+      if (sequence === responseSequence.current) {
+        setError(caught instanceof Error ? caught.message : "Could not submit answer");
+      }
     } finally {
-      setBusy(false);
+      if (sequence === responseSequence.current) setBusy(false);
     }
   };
 
@@ -219,6 +255,11 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
         <div><strong>{appearance.title || title}</strong><span>{appearance.description || (botId ? "Draft preview" : "Published chatbot")}</span></div>
         <button className="icon-button" type="button" aria-label="Restart" onClick={() => void begin()}><RefreshCw size={16} /></button>
       </header>
+      {runtimeSettings.show_progress_bar ? (
+        <div className="chat-progress" aria-label={`Conversation progress ${Math.round(progressPercent)}%`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progressPercent)}>
+          <span style={{ width: `${progressPercent}%` }} />
+        </div>
+      ) : null}
       <div ref={transcriptRef} className="chat-transcript" aria-live="polite">
         {busy && messages.length === 0 ? <p className="chat-placeholder">Starting conversation…</p> : null}
         {messages.map((message) => (
@@ -255,6 +296,13 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
             ) : null}
           </div>
         ))}
+        {isTyping ? (
+          <div className="chat-bubble chat-bubble-bot chat-typing" aria-label="Chatbot is typing">
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : null}
         {error ? <div className="chat-error">{error}</div> : null}
       </div>
       {node ? (

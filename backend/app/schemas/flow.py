@@ -8,6 +8,7 @@ class FlowDocument(BaseModel):
     edges: list[dict[str, Any]] = Field(default_factory=list)
     variables: list[dict[str, Any]] = Field(default_factory=list)
     appearance: dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict)
 
 
 class ValidationIssue(BaseModel):

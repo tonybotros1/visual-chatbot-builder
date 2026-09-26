@@ -5,9 +5,9 @@ import type { BuilderNode } from "@/types/flow";
 import { RichText } from "@/components/content/RichText";
 import { NodeFrame } from "./NodeFrame";
 
-export const ConditionNode = memo(function ConditionNode({ data, selected }: NodeProps<BuilderNode>) {
+export const ConditionNode = memo(function ConditionNode({ id, data, selected }: NodeProps<BuilderNode>) {
   return (
-    <NodeFrame tone="condition" icon={<GitBranch size={14} />} kind="Condition" nodeNumber={data.node_number} selected={selected}>
+    <NodeFrame tone="condition" icon={<GitBranch size={14} />} kind="Condition" nodeId={id} nodeNumber={data.node_number} selected={selected}>
       <Handle type="target" position={Position.Left} />
       <RichText className="node-rich-label" content={data.label} />
       <p>{`${data.variable || "variable"} ${data.operator || "=="} ${String(data.value ?? "value")}`}</p>

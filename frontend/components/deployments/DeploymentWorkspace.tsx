@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ChevronLeft, Clipboard, Code2, ExternalLink, Globe2, Pause, Plus, RefreshCw, Trash2, Users } from "lucide-react";
 import { getBot } from "@/services/bots";
+import { loadFlow } from "@/services/flows";
 import {
   createDeployment,
   createSegment,
@@ -49,8 +50,9 @@ export function DeploymentWorkspace({ botId }: { botId: string }) {
 
   const load = useCallback(async () => {
     try {
-      const [bot, deploymentItems, segmentItems, domainItems] = await Promise.all([getBot(botId), listDeployments(botId), listSegments(), listDomains(botId)]);
+      const [bot, flow, deploymentItems, segmentItems, domainItems] = await Promise.all([getBot(botId), loadFlow(botId), listDeployments(botId), listSegments(), listDomains(botId)]);
       setBotName(bot.name);
+      setMode(flow.settings?.delivery_mode ?? "widget");
       setDeployments(deploymentItems);
       setSegments(segmentItems);
       setDomains(domainItems);

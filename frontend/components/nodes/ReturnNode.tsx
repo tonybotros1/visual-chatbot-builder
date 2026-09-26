@@ -6,9 +6,9 @@ import { RichText } from "@/components/content/RichText";
 import { NodeFrame } from "./NodeFrame";
 
 
-export const ReturnNode = memo(function ReturnNode({ data, selected }: NodeProps<BuilderNode>) {
+export const ReturnNode = memo(function ReturnNode({ id, data, selected }: NodeProps<BuilderNode>) {
   return (
-    <NodeFrame tone="logic" icon={<CornerUpLeft size={14} />} kind="Return" nodeNumber={data.node_number} selected={selected}>
+    <NodeFrame tone="logic" icon={<CornerUpLeft size={14} />} kind="Return" nodeId={id} nodeNumber={data.node_number} selected={selected}>
       <Handle type="target" position={Position.Left} />
       <RichText className="node-rich-label" content={data.label} />
       <p>Map outputs back to the parent flow</p>

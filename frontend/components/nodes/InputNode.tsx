@@ -32,11 +32,11 @@ const config = {
   appointment: { kind: "Appointment shell", icon: CalendarDays, tone: "integration" as const },
 };
 
-export const InputNode = memo(function InputNode({ data, selected, type }: NodeProps<BuilderNode>) {
+export const InputNode = memo(function InputNode({ id, data, selected, type }: NodeProps<BuilderNode>) {
   const selectedConfig = config[type as keyof typeof config] ?? config.textInput;
   const Icon = selectedConfig.icon;
   return (
-    <NodeFrame tone={selectedConfig.tone} icon={<Icon size={14} />} kind={selectedConfig.kind} nodeNumber={data.node_number} selected={selected}>
+    <NodeFrame tone={selectedConfig.tone} icon={<Icon size={14} />} kind={selectedConfig.kind} nodeId={id} nodeNumber={data.node_number} selected={selected}>
       <Handle type="target" position={Position.Left} />
       <RichText className="node-rich-label" content={data.label} />
       <p>{data.variable ? `Saves to ${data.variable}` : "Variable not set"}</p>

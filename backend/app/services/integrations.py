@@ -18,13 +18,55 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models.bot import Bot
+from app.models.bot import Bot, BotVersion
 from app.models.conversation import Conversation
 from app.models.integration import BotEventSubscription, IntegrationConnection, IntegrationDelivery
 from app.services.secret_vault import decrypt_secrets
 
 
 RETRY_DELAYS = [60, 300, 1800, 7200, 43200]
+
+
+def _notification_settings(db: Session, conversation: Conversation) -> dict[str, Any]:
+    version = db.get(BotVersion, conversation.bot_version_id)
+    if version is None:
+        return {}
+    return dict((version.flow_json or {}).get("settings") or {})
+
+
+def _notification_filters_match(settings: dict[str, Any], variables: dict[str, Any]) -> bool:
+    filters = settings.get("notification_filters") or []
+    for item in filters:
+        if not isinstance(item, dict):
+            continue
+        variable = str(item.get("variable") or "").strip()
+        expected = str(item.get("value") or "").strip().casefold()
+        if not variable or not expected:
+            continue
+        actual_value = variables.get(variable, "")
+        if isinstance(actual_value, list):
+            actual = ", ".join(str(value) for value in actual_value).casefold()
+        else:
+            actual = str(actual_value).casefold()
+        operator = str(item.get("operator") or "equals")
+        matches = expected in actual if operator == "contains" else actual == expected
+        if operator == "not_equals":
+            matches = actual != expected
+        if not matches:
+            return False
+    return True
+
+
+def _notification_payload(settings: dict[str, Any], flow: dict[str, Any]) -> dict[str, Any]:
+    recipients = settings.get("notification_to_emails") or []
+    return {
+        "from_email": str(settings.get("notification_from_email") or "").strip(),
+        "to_emails": [str(value).strip() for value in recipients if str(value).strip()],
+        "subject": str(settings.get("notification_subject") or "").strip(),
+        "subject_append": str(settings.get("notification_subject_append") or "none"),
+        "reply_to_variable": str(settings.get("notification_reply_to_variable") or "").strip(),
+        "chatbot_title": str((flow.get("appearance") or {}).get("title") or "Spaghetti chatbot").strip(),
+    }
 
 
 def validate_webhook_url(value: str) -> str:
@@ -66,6 +108,9 @@ def enqueue_event(db: Session, event: str, conversation: Conversation) -> int:
             )
         )
     )
+    settings = _notification_settings(db, conversation)
+    version = db.get(BotVersion, conversation.bot_version_id)
+    flow = (version.flow_json or {}) if version else {}
     payload = {
         "event": event,
         "occurred_at": datetime.now(UTC).isoformat(),
@@ -79,8 +124,17 @@ def enqueue_event(db: Session, event: str, conversation: Conversation) -> int:
             "metadata": conversation.context_data or {},
             "tags": conversation.tags or [],
         },
+        "_notification": _notification_payload(settings, flow),
     }
     for subscription in subscriptions:
+        connection = db.get(IntegrationConnection, subscription.connection_id)
+        if connection is not None and connection.kind == "email":
+            if settings.get("email_notifications_enabled") is False:
+                continue
+            if event == "conversation.started" and settings.get("send_incomplete_notifications") is False:
+                continue
+            if not _notification_filters_match(settings, conversation.variables or {}):
+                continue
         db.add(
             IntegrationDelivery(
                 bot_id=conversation.bot_id,
@@ -172,11 +226,31 @@ def _deliver_http(connection: IntegrationConnection, payload: dict[str, Any]) ->
 def _deliver_email(connection: IntegrationConnection, payload: dict[str, Any]) -> None:
     config = connection.config
     secrets = decrypt_secrets(connection.encrypted_secrets)
+    notification = payload.get("_notification") if isinstance(payload.get("_notification"), dict) else {}
+    conversation = payload.get("conversation") if isinstance(payload.get("conversation"), dict) else {}
+    subject = str(notification.get("subject") or config.get("subject") or f"Chatbot event: {payload.get('event')}")
+    append_kind = str(notification.get("subject_append") or "none")
+    suffix = ""
+    if append_kind == "chatbot_title":
+        suffix = str(notification.get("chatbot_title") or "")
+    elif append_kind == "status":
+        suffix = str(conversation.get("status") or "")
+    elif append_kind == "session_id":
+        suffix = str(conversation.get("session_id") or "")
+    if suffix:
+        subject = f"{subject} · {suffix}"
+    recipients = notification.get("to_emails") if isinstance(notification.get("to_emails"), list) else []
+    variables = conversation.get("variables") if isinstance(conversation.get("variables"), dict) else {}
+    reply_to_variable = str(notification.get("reply_to_variable") or "")
+    reply_to = str(variables.get(reply_to_variable) or "").strip() if reply_to_variable else ""
     message = EmailMessage()
-    message["Subject"] = str(config.get("subject") or f"Chatbot event: {payload.get('event')}")
-    message["From"] = str(config.get("from_email") or secrets.get("username") or "")
-    message["To"] = str(config.get("to_email") or "")
-    message.set_content(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+    message["Subject"] = subject.replace("\r", " ").replace("\n", " ")
+    message["From"] = str(notification.get("from_email") or config.get("from_email") or secrets.get("username") or "").replace("\r", "").replace("\n", "")
+    message["To"] = ", ".join(str(value) for value in recipients) if recipients else str(config.get("to_email") or "")
+    if "@" in reply_to and "\r" not in reply_to and "\n" not in reply_to:
+        message["Reply-To"] = reply_to
+    body_payload = {key: value for key, value in payload.items() if key != "_notification"}
+    message.set_content(json.dumps(body_payload, ensure_ascii=False, indent=2, default=str))
     host, port = str(config.get("host") or ""), int(config.get("port") or 587)
     with smtplib.SMTP(host, port, timeout=10) as client:
         if config.get("starttls", True):

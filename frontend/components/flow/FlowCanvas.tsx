@@ -10,6 +10,7 @@ import {
   ReactFlow,
   useReactFlow,
   useUpdateNodeInternals,
+  type EdgeTypes,
   type NodeTypes,
 } from "@xyflow/react";
 import { useFlowStore } from "@/stores/flow-store";
@@ -25,6 +26,7 @@ import { StartNode } from "@/components/nodes/StartNode";
 import { SubflowNode } from "@/components/nodes/SubflowNode";
 import { ReturnNode } from "@/components/nodes/ReturnNode";
 import { LogicNode } from "@/components/nodes/LogicNode";
+import { ObstacleAwareEdge } from "@/components/edges/ObstacleAwareEdge";
 
 const nodeTypes: NodeTypes = {
   start: StartNode,
@@ -54,6 +56,10 @@ const nodeTypes: NodeTypes = {
   subflow: SubflowNode,
   return: ReturnNode,
   end: EndNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  obstacle: ObstacleAwareEdge,
 };
 
 const minimapColors: Record<BuilderNodeType, string> = {
@@ -155,6 +161,8 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: "obstacle" }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

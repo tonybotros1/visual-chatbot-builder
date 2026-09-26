@@ -276,9 +276,9 @@ def _json_request(url: str, *, method: str = "GET", headers: dict[str, str] | No
 
 
 def appointment_slots(db: Session, conversation_id: UUID, node_id: str) -> list[tuple[datetime, datetime, str]]:
-    _, node = current_provider_node(db, conversation_id, node_id, "appointment")
+    conversation, node = current_provider_node(db, conversation_id, node_id, "appointment")
     data = node.get("data", {})
-    timezone_name = str(data.get("timezone") or "UTC")
+    timezone_name = _appointment_timezone(db, conversation, data)
     try: timezone = ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError as exc: raise EngineError("Appointment timezone is invalid") from exc
     duration = max(5, min(480, int(data.get("duration_minutes") or 30)))
@@ -315,9 +315,9 @@ def appointment_slots(db: Session, conversation_id: UUID, node_id: str) -> list[
 
 
 def book_appointment(db: Session, conversation_id: UUID, node_id: str, starts_at: datetime, metadata: dict[str, Any]) -> AppointmentReservation:
-    _, node = current_provider_node(db, conversation_id, node_id, "appointment")
+    conversation, node = current_provider_node(db, conversation_id, node_id, "appointment")
     data = node.get("data", {})
-    timezone_name = str(data.get("timezone") or "UTC")
+    timezone_name = _appointment_timezone(db, conversation, data)
     duration = max(5, min(480, int(data.get("duration_minutes") or 30)))
     start = starts_at.replace(tzinfo=UTC) if starts_at.tzinfo is None else starts_at.astimezone(UTC)
     end = start + timedelta(minutes=duration)
@@ -337,6 +337,15 @@ def book_appointment(db: Session, conversation_id: UUID, node_id: str, starts_at
         ends_at=end, timezone=timezone_name, status="confirmed", details=metadata,
     )
     db.add(item); db.commit(); db.refresh(item); return item
+
+
+def _appointment_timezone(db: Session, conversation: Conversation, node_data: dict[str, Any]) -> str:
+    if node_data.get("timezone"):
+        return str(node_data["timezone"])
+    version = db.get(BotVersion, conversation.bot_version_id)
+    if version is None:
+        return "UTC"
+    return str(version.flow_json.get("settings", {}).get("timezone") or "UTC")
 
 
 def _calendar_busy(connection: IntegrationConnection, start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:

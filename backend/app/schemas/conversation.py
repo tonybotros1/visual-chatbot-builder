@@ -34,6 +34,8 @@ class ConversationState(BaseModel):
     locale: str = "en"
     direction: str = "ltr"
     appearance: dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict)
+    progress_percent: float = 0
 
 
 class AnswerRead(BaseModel):

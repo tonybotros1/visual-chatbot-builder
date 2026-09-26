@@ -116,9 +116,31 @@ export type FlowAppearance = {
   layout_style: "card" | "personal" | "modern" | "minimal";
 };
 
+export type FlowSettings = {
+  enabled: boolean;
+  show_progress_bar: boolean;
+  response_delay_seconds: number;
+  delivery_mode: "widget" | "link" | "embed";
+  timezone: string;
+  collect_visitor_context: boolean;
+  email_notifications_enabled: boolean;
+  send_incomplete_notifications: boolean;
+  notification_from_email: string;
+  notification_to_emails: string[];
+  notification_subject: string;
+  notification_subject_append: "none" | "chatbot_title" | "status" | "session_id";
+  notification_reply_to_variable: string;
+  notification_filters: Array<{
+    variable: string;
+    operator: "equals" | "not_equals" | "contains";
+    value: string;
+  }>;
+};
+
 export type FlowDocument = {
   nodes: BuilderNode[];
   edges: BuilderEdge[];
   variables: Array<Record<string, unknown>>;
   appearance?: FlowAppearance;
+  settings?: FlowSettings;
 };

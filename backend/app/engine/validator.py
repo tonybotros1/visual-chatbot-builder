@@ -342,6 +342,93 @@ def validate_flow(
     )
 
 
+def validate_flow_connections(
+    flow: dict[str, Any],
+    *,
+    terminal_types: set[str] | None = None,
+) -> ValidationReport:
+    """Return only node-connection problems for the visual builder validator."""
+    terminal_types = terminal_types or set(TERMINAL_TYPES)
+    nodes = [node for node in flow.get("nodes", []) if node.get("id")]
+    node_by_id = {str(node["id"]): node for node in nodes}
+    node_ids = set(node_by_id)
+    valid_edges = [
+        edge
+        for edge in flow.get("edges", [])
+        if str(edge.get("source")) in node_ids and str(edge.get("target")) in node_ids
+    ]
+    incoming: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    outgoing: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for edge in valid_edges:
+        outgoing[str(edge["source"])].append(edge)
+        incoming[str(edge["target"])].append(edge)
+
+    unreachable: set[str] = set()
+    starts = [node for node in nodes if node.get("type") == "start"]
+    if len(starts) == 1:
+        start_id = str(starts[0]["id"])
+        reachable: set[str] = set()
+        stack = [start_id]
+        while stack:
+            current = stack.pop()
+            if current in reachable:
+                continue
+            reachable.add(current)
+            stack.extend(str(edge["target"]) for edge in outgoing[current])
+        unreachable = node_ids - reachable
+
+    issues: list[ValidationIssue] = []
+    branching_types = {"choice", "singleChoice", "multipleChoice"}
+    for node in nodes:
+        node_id = str(node["id"])
+        node_type = str(node.get("type") or "")
+        data = node.get("data") or {}
+        reasons: list[str] = []
+        if node_type != "start" and not incoming[node_id]:
+            reasons.append("needs an incoming connection")
+        if node_type not in terminal_types and not outgoing[node_id]:
+            reasons.append("needs an outgoing connection")
+        if node_id in unreachable:
+            reasons.append("is not connected to Start")
+
+        connected_handles = {str(edge.get("sourceHandle") or "") for edge in outgoing[node_id]}
+        if node_type in branching_types:
+            options = data.get("options") or []
+            missing_routes = [
+                str(option or f"Option {index + 1}")
+                for index, option in enumerate(options)
+                if f"option-{index}" not in connected_handles
+            ]
+            if data.get("required", True) is False and "skip" not in connected_handles:
+                missing_routes.append("Skip")
+            if missing_routes:
+                reasons.append(f"has unconnected routes: {', '.join(missing_routes)}")
+        elif node_type == "condition":
+            missing_routes = [label for label in ("true", "false") if label not in connected_handles]
+            if missing_routes:
+                reasons.append(f"has unconnected routes: {', '.join(label.title() for label in missing_routes)}")
+
+        if not reasons:
+            continue
+        number = data.get("node_number")
+        label = re.sub(r"\s+", " ", str(data.get("label") or node_type or "Node")).strip()
+        if len(label) > 64:
+            label = f"{label[:61]}..."
+        display_name = f"Node #{number}" if number is not None else "Node"
+        if label:
+            display_name += f' “{label}”'
+        issues.append(
+            ValidationIssue(
+                severity="error",
+                code="unconnected_node",
+                message=f"{display_name} {'; '.join(reasons)}.",
+                node_ids=[node_id],
+            )
+        )
+
+    return ValidationReport(valid=not issues, issues=issues)
+
+
 def _has_cycle(start_id: str, outgoing: dict[str, list[str]]) -> bool:
     visiting: set[str] = set()
     visited: set[str] = set()

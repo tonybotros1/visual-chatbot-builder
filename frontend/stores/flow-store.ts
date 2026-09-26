@@ -16,6 +16,7 @@ import type {
   BuilderNodeType,
   FlowAppearance,
   FlowDocument,
+  FlowSettings,
 } from "@/types/flow";
 
 export const defaultFlowAppearance: FlowAppearance = {
@@ -27,6 +28,23 @@ export const defaultFlowAppearance: FlowAppearance = {
   text_color: "#211D29",
   avatar_url: "",
   layout_style: "card",
+};
+
+export const defaultFlowSettings: FlowSettings = {
+  enabled: true,
+  show_progress_bar: false,
+  response_delay_seconds: 0,
+  delivery_mode: "widget",
+  timezone: "Asia/Dubai",
+  collect_visitor_context: true,
+  email_notifications_enabled: true,
+  send_incomplete_notifications: false,
+  notification_from_email: "",
+  notification_to_emails: [],
+  notification_subject: "New response from Spaghetti",
+  notification_subject_append: "none",
+  notification_reply_to_variable: "",
+  notification_filters: [],
 };
 
 export const initialNodes: BuilderNode[] = [
@@ -89,6 +107,7 @@ export const initialEdges: BuilderEdge[] = [
 ];
 
 const edgeDefaults = {
+  type: "obstacle",
   markerEnd: { type: MarkerType.ArrowClosed },
   style: { strokeWidth: 2 },
 };
@@ -404,7 +423,6 @@ const nodeDefaults: Record<BuilderNodeType, BuilderNodeData> = {
     required: true,
     provider: "local",
     duration_minutes: 30,
-    timezone: "UTC",
   },
   ruleSet: {
     label: "Reusable rule set",
@@ -444,6 +462,7 @@ type FlowState = {
   nodes: BuilderNode[];
   edges: BuilderEdge[];
   appearance: FlowAppearance;
+  settings: FlowSettings;
   selectedNodeId: string | null;
   searchQuery: string;
   layoutRevision: number;
@@ -460,6 +479,7 @@ type FlowState = {
   addNode: (type: BuilderNodeType, position: XYPosition) => void;
   updateNodeData: (nodeId: string, updates: Partial<BuilderNodeData>) => void;
   updateAppearance: (updates: Partial<FlowAppearance>) => void;
+  updateSettings: (updates: Partial<FlowSettings>) => void;
   selectNode: (nodeId: string | null) => void;
   setSearchQuery: (query: string) => void;
   formatLayout: () => void;
@@ -498,6 +518,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: cloneInitialNodes(),
   edges: cloneInitialEdges(),
   appearance: { ...defaultFlowAppearance },
+  settings: { ...defaultFlowSettings },
   selectedNodeId: null,
   searchQuery: "",
   layoutRevision: 0,
@@ -604,6 +625,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       isDirty: true,
     })),
 
+  updateSettings: (updates) =>
+    set((state) => ({
+      settings: { ...state.settings, ...updates },
+      isDirty: true,
+    })),
+
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   formatLayout: () =>
@@ -623,6 +650,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes,
       edges: sanitized.map((edge) => ({ ...edge, ...edgeDefaults })),
       appearance: { ...defaultFlowAppearance, ...(document.appearance ?? {}) },
+      settings: { ...defaultFlowSettings, ...(document.settings ?? {}) },
       selectedNodeId: null,
       layoutRevision: get().layoutRevision,
       isDirty: assignedNodeNumbers || sanitized.length !== document.edges.length,
@@ -636,6 +664,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: cleanEdges(nodes, get().edges),
       variables: [],
       appearance: { ...get().appearance },
+      settings: { ...get().settings },
     };
   },
 
@@ -646,6 +675,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: cloneInitialNodes(),
       edges: cloneInitialEdges(),
       appearance: { ...defaultFlowAppearance },
+      settings: { ...defaultFlowSettings },
       selectedNodeId: null,
       searchQuery: "",
       layoutRevision: get().layoutRevision + 1,

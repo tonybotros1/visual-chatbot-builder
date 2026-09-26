@@ -5,7 +5,7 @@ import type { BuilderNode } from "@/types/flow";
 import { RichText } from "@/components/content/RichText";
 import { NodeFrame } from "./NodeFrame";
 
-export const ChoiceNode = memo(function ChoiceNode({ data, selected, type }: NodeProps<BuilderNode>) {
+export const ChoiceNode = memo(function ChoiceNode({ id, data, selected, type }: NodeProps<BuilderNode>) {
   const options = data.options?.length ? data.options : ["Option 1", "Option 2"];
 
   return (
@@ -13,6 +13,7 @@ export const ChoiceNode = memo(function ChoiceNode({ data, selected, type }: Nod
       tone="question"
       icon={<ListChecks size={14} />}
       kind={type === "multipleChoice" ? "Multiple choice" : "Single choice"}
+      nodeId={id}
       nodeNumber={data.node_number}
       selected={selected}
     >
