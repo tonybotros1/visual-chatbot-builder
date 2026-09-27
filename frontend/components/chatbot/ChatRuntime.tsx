@@ -43,6 +43,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [direction, setDirection] = useState<"ltr" | "rtl">("ltr");
   const [appearance, setAppearance] = useState<ConversationState["appearance"]>({});
+  const [appearanceReady, setAppearanceReady] = useState(false);
   const [runtimeSettings, setRuntimeSettings] = useState<ConversationState["settings"]>({});
   const [progressPercent, setProgressPercent] = useState(0);
   const [otpChallengeId, setOtpChallengeId] = useState<string | null>(null);
@@ -126,6 +127,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
     setNode(null);
     setDirection(state.direction ?? "ltr");
     setAppearance(state.appearance ?? {});
+    setAppearanceReady(true);
     setRuntimeSettings(state.settings ?? {});
     setProgressPercent(state.progress_percent ?? 0);
     const requestedDelay = Number(state.settings?.response_delay_seconds ?? 0);
@@ -246,13 +248,25 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
     "--chat-text": appearance.text_color ?? "#211D29",
   } as CSSProperties;
 
+  if (!appearanceReady) {
+    return (
+      <section className="chat-shell chat-shell-loading" aria-busy={!error} aria-live="polite">
+        <div className="chat-loading-content">
+          <SpaghettiMark size={38} />
+          <strong>{error ? "Preview unavailable" : "Loading preview…"}</strong>
+          {error ? <span>{error}</span> : null}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={`chat-shell chat-layout-${appearance.layout_style ?? "card"}`} dir={direction} lang={stateLocale(locale)} style={chatStyle}>
       <header className="chat-header">
         <span className="chat-profile-picture">
           {appearance.avatar_url ? <img src={appearance.avatar_url} alt="Chat profile" /> : <SpaghettiMark size={31} />}
         </span>
-        <div><strong>{appearance.title || title}</strong><span>{appearance.description || (botId ? "Draft preview" : "Published chatbot")}</span></div>
+        <div><strong>{appearance.title || title}</strong>{appearance.description ? <span>{appearance.description}</span> : null}</div>
         <button className="icon-button" type="button" aria-label="Restart" onClick={() => void begin()}><RefreshCw size={16} /></button>
       </header>
       {runtimeSettings.show_progress_bar ? (

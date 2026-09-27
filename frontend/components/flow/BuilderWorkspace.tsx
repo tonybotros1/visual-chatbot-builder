@@ -23,6 +23,7 @@ import {
   Save,
   Search,
   Send,
+  Share2,
   Settings2,
 } from "lucide-react";
 import { PropertiesPanel } from "@/components/properties/PropertiesPanel";
@@ -35,6 +36,7 @@ import type { ValidationIssue } from "@/types/api";
 import type { BuilderNodeType, FlowDocument } from "@/types/flow";
 import { FlowCanvas } from "./FlowCanvas";
 import { DesignWorkspace } from "./DesignWorkspace";
+import { ShareWorkspace } from "./ShareWorkspace";
 import { SettingsWorkspace } from "./SettingsWorkspace";
 
 type SaveState = "idle" | "loading" | "saving" | "saved" | "local" | "error";
@@ -99,7 +101,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const [message, setMessage] = useState("Loading draft…");
   const [botName, setBotName] = useState("Bot builder");
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
-  const [activeTab, setActiveTab] = useState<"questions" | "design" | "settings">("questions");
+  const [activeTab, setActiveTab] = useState<"questions" | "design" | "share" | "settings">("questions");
 
   const loadDraft = useCallback(async () => {
     setSaveState("loading");
@@ -204,7 +206,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
 
   return (
     <main
-      className={`builder-page${activeTab === "design" ? " is-design-mode" : activeTab === "settings" ? " is-settings-mode" : ""}`}
+      className={`builder-page${activeTab === "design" ? " is-design-mode" : activeTab === "share" ? " is-share-mode" : activeTab === "settings" ? " is-settings-mode" : ""}`}
       style={{
         "--builder-canvas-color": "#FFFFFF",
         "--builder-node-color": appearance.surface_color,
@@ -324,6 +326,16 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
           <Palette size={16} /> Design
         </button>
         <button
+          className={activeTab === "share" ? "is-active" : ""}
+          type="button"
+          onClick={() => {
+            selectNode(null);
+            setActiveTab("share");
+          }}
+        >
+          <Share2 size={16} /> Share
+        </button>
+        <button
           className={activeTab === "settings" ? "is-active" : ""}
           type="button"
           onClick={() => {
@@ -362,6 +374,8 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
         </div>
       ) : activeTab === "design" ? (
         <DesignWorkspace />
+      ) : activeTab === "share" ? (
+        <ShareWorkspace botId={botId} />
       ) : (
         <SettingsWorkspace botId={botId} />
       )}

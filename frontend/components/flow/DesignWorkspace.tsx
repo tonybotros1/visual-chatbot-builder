@@ -220,7 +220,7 @@ export function DesignWorkspace() {
             <span className="design-preview-avatar">{avatar}</span>
             <div>
               <strong>{appearance.title || "Spaghetti chatbot"}</strong>
-              <span>{appearance.description || "We are online and ready to help."}</span>
+              {appearance.description ? <span>{appearance.description}</span> : null}
             </div>
           </header>
           <div className="design-preview-conversation" style={{ background: appearance.background_color }}>

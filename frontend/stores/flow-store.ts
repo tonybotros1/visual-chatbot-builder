@@ -21,7 +21,7 @@ import type {
 
 export const defaultFlowAppearance: FlowAppearance = {
   title: "Spaghetti chatbot",
-  description: "We are online and ready to help.",
+  description: "",
   primary_color: "#7C3AED",
   background_color: "#FFFFFF",
   surface_color: "#FFFFFF",
@@ -643,17 +643,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setGraph: (document) => {
     const nodes = cleanNodes(document.nodes);
     const sanitized = cleanEdges(nodes, document.edges);
+    const loadedAppearance = { ...defaultFlowAppearance, ...(document.appearance ?? {}) };
+    const hasLegacyDefaultDescription = loadedAppearance.description === "We are online and ready to help.";
+    if (hasLegacyDefaultDescription) loadedAppearance.description = "";
     const assignedNodeNumbers = document.nodes.some(
       (node, index) => node.data.node_number !== nodes[index]?.data.node_number,
     );
     set({
       nodes,
       edges: sanitized.map((edge) => ({ ...edge, ...edgeDefaults })),
-      appearance: { ...defaultFlowAppearance, ...(document.appearance ?? {}) },
+      appearance: loadedAppearance,
       settings: { ...defaultFlowSettings, ...(document.settings ?? {}) },
       selectedNodeId: null,
       layoutRevision: get().layoutRevision,
-      isDirty: assignedNodeNumbers || sanitized.length !== document.edges.length,
+      isDirty: assignedNodeNumbers || sanitized.length !== document.edges.length || hasLegacyDefaultDescription,
     });
   },
 
