@@ -28,6 +28,7 @@ import {
 } from "@/services/subflows";
 import { useFlowStore } from "@/stores/flow-store";
 import type { BuilderNodeType, FactSchema, FlowDocument } from "@/types/flow";
+import { alertDialog } from "@/stores/dialog-store";
 
 
 type SaveState = "idle" | "loading" | "saving" | "saved" | "local" | "error";
@@ -123,7 +124,7 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
       const errors = report.issues.filter((issue) => issue.severity === "error");
       setMessage(report.valid ? `Component is valid${report.issues.length ? ` (${report.issues.length} warnings)` : ""}` : `${errors.length} validation errors`);
       setSaveState(report.valid ? "saved" : "error");
-      if (!report.valid) window.alert(errors.map((issue) => issue.message).join("\n"));
+      if (!report.valid) void alertDialog({ title: `${errors.length} validation ${errors.length === 1 ? "error" : "errors"}`, message: errors.map((issue) => issue.message).join("\n") });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Validation failed");
       setSaveState("error");

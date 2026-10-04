@@ -7034,3 +7034,149 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* Themed confirm / prompt / alert dialogs (components/ui/DialogHost.tsx) */
+.app-dialog {
+  /* Tailwind preflight zeroes the UA margin that centers modal dialogs. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgba(23, 20, 29, 0.24);
+}
+
+.app-dialog::backdrop {
+  background: rgba(23, 20, 29, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.app-dialog[open] {
+  animation: app-dialog-in 160ms ease-out;
+}
+
+@keyframes app-dialog-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dialog[open] { animation: none; }
+}
+
+.app-dialog-panel {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.app-dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-dialog-heading h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.app-dialog-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: #a33546;
+  background: #fff0f2;
+}
+
+.app-dialog-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.app-dialog-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.app-dialog-field input {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: white;
+  font: inherit;
+  font-weight: 500;
+}
+
+.app-dialog-field input:focus {
+  border-color: var(--brand-secondary);
+  outline: 3px solid color-mix(in srgb, var(--brand-secondary) 16%, transparent);
+}
+
+.app-dialog-field input[aria-invalid="true"] {
+  border-color: #d9475d;
+}
+
+.app-dialog-error {
+  color: #a33546;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.app-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.app-dialog-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: #c2364c;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.app-dialog-danger:hover {
+  background: #a62b3f;
+}
+
+.app-dialog :focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-secondary) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.dashboard-error {
+  margin: 0 0 16px;
+}

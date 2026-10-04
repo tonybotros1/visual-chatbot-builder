@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Archive, Blocks, ListTree, LogOut, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { archiveBot, createBot, listBots, updateBot } from "@/services/bots";
+import { confirmDialog, promptDialog } from "@/stores/dialog-store";
 import { currentUser, logout } from "@/services/auth";
 import type { BotRecord, User } from "@/types/api";
 
@@ -48,16 +49,38 @@ export default function DashboardPage() {
   };
 
   const rename = async (bot: BotRecord) => {
-    const nextName = window.prompt("Bot name", bot.name)?.trim();
+    const nextName = await promptDialog({
+      title: "Rename bot",
+      label: "Bot name",
+      defaultValue: bot.name,
+      confirmLabel: "Rename",
+      validate: (value) => (value ? null : "Enter a name for this bot."),
+    });
     if (!nextName || nextName === bot.name) return;
-    const updated = await updateBot(bot.id, { name: nextName });
-    setBots((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+    setError("");
+    try {
+      const updated = await updateBot(bot.id, { name: nextName });
+      setBots((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not rename bot");
+    }
   };
 
   const archive = async (bot: BotRecord) => {
-    if (!window.confirm(`Archive “${bot.name}”?`)) return;
-    await archiveBot(bot.id);
-    setBots((items) => items.filter((item) => item.id !== bot.id));
+    const confirmed = await confirmDialog({
+      title: `Archive “${bot.name}”?`,
+      message: "It will be hidden from your dashboard and its public link will stop starting new conversations.",
+      confirmLabel: "Archive bot",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setError("");
+    try {
+      await archiveBot(bot.id);
+      setBots((items) => items.filter((item) => item.id !== bot.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not archive bot");
+    }
   };
 
   if (loading) return <main className="centered-page">Loading your bots…</main>;
@@ -82,6 +105,8 @@ export default function DashboardPage() {
           </button>
         </div>
       </header>
+
+      {error && !showCreate ? <p className="form-error dashboard-error" role="alert">{error}</p> : null}
 
       {showCreate ? (
         <form className="create-bot-card" onSubmit={handleCreate}>

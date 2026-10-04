@@ -2,6 +2,7 @@
 
 import type { MouseEvent, PointerEvent, ReactNode } from "react";
 import { Trash2 } from "lucide-react";
+import { confirmNodeDeletion } from "@/stores/dialog-store";
 import { useFlowStore } from "@/stores/flow-store";
 
 type NodeFrameProps = {
@@ -32,10 +33,10 @@ export function NodeFrame({
     event.stopPropagation();
   };
 
-  const deleteNode = (event: MouseEvent<HTMLButtonElement>) => {
+  const deleteNode = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     const nodeLabel = `${kind} node${nodeNumber ? ` #${nodeNumber}` : ""}`;
-    if (!window.confirm(`Delete ${nodeLabel}?\n\nThis action cannot be undone.`)) return;
+    if (!(await confirmNodeDeletion(nodeLabel))) return;
     onNodesChange([{ id: nodeId, type: "remove" }]);
     if (selected) selectNode(null);
   };

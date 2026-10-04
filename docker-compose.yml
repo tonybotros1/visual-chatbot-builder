@@ -11,6 +11,9 @@ services:
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
+      # Keep the container's Next.js build cache separate from a host `npm run dev`;
+      # sharing one .next directory corrupts the Turbopack cache.
+      - frontend_next:/app/.next
     depends_on:
       backend:
         condition: service_started
@@ -21,7 +24,7 @@ services:
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://visual_chatbot:visual_chatbot_dev@postgres:5432/visual_chatbot}
-      CORS_ORIGINS: '["http://localhost:3000", "http://127.0.0.1:3000"]'
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000", "http://127.0.0.1:3000"]}
       SECRET_KEY: ${SECRET_KEY:-replace-this-development-secret-before-production}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-720}
       UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-data/uploads}
@@ -66,4 +69,5 @@ services:
 
 volumes:
   frontend_node_modules:
+  frontend_next:
   postgres_data:

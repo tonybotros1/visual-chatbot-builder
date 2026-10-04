@@ -56,24 +56,77 @@ function QuestionsWorkspace() {
     if (!canvas) return;
 
     const bounds = canvas.getBoundingClientRect();
+    const viewportTopLeft = screenToFlowPosition({
+      x: bounds.left,
+      y: bounds.top,
+    });
+    const viewportBottomRight = screenToFlowPosition({
+      x: bounds.right,
+      y: bounds.bottom,
+    });
     const viewportCenter = screenToFlowPosition({
       x: bounds.left + bounds.width / 2,
       y: bounds.top + bounds.height / 2,
     });
-    const basePosition = {
-      x: viewportCenter.x - 130,
-      y: viewportCenter.y - 65,
-    };
-    const nearbyNodes = nodes.filter((node) =>
-      Math.abs(node.position.x - basePosition.x) < 190 &&
-      Math.abs(node.position.y - basePosition.y) < 130,
-    ).length;
-    const cascadeOffset = (nearbyNodes % 6) * 26;
 
-    addNode(type, {
-      x: basePosition.x + cascadeOffset,
-      y: basePosition.y + cascadeOffset,
+    // Click-to-add should always land inside the view the user is currently
+    // working in. Search that view from its center outwards and choose the
+    // first position that does not overlap an existing node.
+    const newNodeWidth = 280;
+    const newNodeHeight = 150;
+    const nodeGap = 34;
+    const viewportMargin = 28;
+    const minX = viewportTopLeft.x + viewportMargin;
+    const minY = viewportTopLeft.y + viewportMargin;
+    const maxX = Math.max(minX, viewportBottomRight.x - newNodeWidth - viewportMargin);
+    const maxY = Math.max(minY, viewportBottomRight.y - newNodeHeight - viewportMargin);
+    const clamp = (value: number, minimum: number, maximum: number) =>
+      Math.min(maximum, Math.max(minimum, value));
+    const centerPosition = {
+      x: clamp(viewportCenter.x - newNodeWidth / 2, minX, maxX),
+      y: clamp(viewportCenter.y - newNodeHeight / 2, minY, maxY),
+    };
+
+    const candidates = [centerPosition];
+    const horizontalStep = newNodeWidth + nodeGap;
+    const verticalStep = newNodeHeight + nodeGap;
+    for (let y = minY; y <= maxY + 1; y += verticalStep) {
+      for (let x = minX; x <= maxX + 1; x += horizontalStep) {
+        candidates.push({ x, y });
+      }
+    }
+    candidates.sort((left, right) => {
+      const leftDistance = Math.hypot(left.x - centerPosition.x, left.y - centerPosition.y);
+      const rightDistance = Math.hypot(right.x - centerPosition.x, right.y - centerPosition.y);
+      return leftDistance - rightDistance;
     });
+
+    const overlapArea = (candidate: { x: number; y: number }, node: (typeof nodes)[number]) => {
+      const existingWidth = node.measured?.width ?? node.width ?? 280;
+      const existingHeight = node.measured?.height ?? node.height ?? 150;
+      const overlapWidth = Math.max(
+        0,
+        Math.min(candidate.x + newNodeWidth, node.position.x + existingWidth + nodeGap)
+          - Math.max(candidate.x, node.position.x - nodeGap),
+      );
+      const overlapHeight = Math.max(
+        0,
+        Math.min(candidate.y + newNodeHeight, node.position.y + existingHeight + nodeGap)
+          - Math.max(candidate.y, node.position.y - nodeGap),
+      );
+      return overlapWidth * overlapHeight;
+    };
+
+    const clearPosition = candidates.find((candidate) =>
+      nodes.every((node) => overlapArea(candidate, node) === 0),
+    );
+    const leastCrowdedPosition = clearPosition ?? candidates.reduce((best, candidate) => {
+      const candidateOverlap = nodes.reduce((total, node) => total + overlapArea(candidate, node), 0);
+      const bestOverlap = nodes.reduce((total, node) => total + overlapArea(best, node), 0);
+      return candidateOverlap < bestOverlap ? candidate : best;
+    }, centerPosition);
+
+    addNode(type, leastCrowdedPosition);
   }, [addNode, nodes, screenToFlowPosition]);
 
   return (

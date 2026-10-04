@@ -7,6 +7,7 @@ import { CheckCircle2, ChevronLeft, FileJson2, FlaskConical, Save, Send } from "
 import { ContractEditor } from "@/components/subflows/ContractEditor";
 import { evaluateLogic, getLogicAsset, getLogicDraft, publishLogic, saveLogicDraft, validateLogic } from "@/services/logic";
 import type { FactSchema } from "@/types/flow";
+import { alertDialog } from "@/stores/dialog-store";
 
 
 export function LogicWorkspace({ assetId }: { assetId: string }) {
@@ -59,7 +60,7 @@ export function LogicWorkspace({ assetId }: { assetId: string }) {
       const report = await validateLogic(assetId);
       const errors = report.issues.filter((issue) => issue.severity === "error");
       setMessage(report.valid ? `Definition is valid${report.issues.length ? ` (${report.issues.length} notices)` : ""}` : `${errors.length} validation errors`);
-      if (!report.valid) window.alert(errors.map((issue) => issue.message).join("\n"));
+      if (!report.valid) void alertDialog({ title: `${errors.length} validation ${errors.length === 1 ? "error" : "errors"}`, message: errors.map((issue) => issue.message).join("\n") });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Validation failed");
     }

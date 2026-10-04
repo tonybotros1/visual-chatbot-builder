@@ -4,6 +4,7 @@ import { Bold, Check, ChevronDown, ImagePlus, Italic, Link2, List, ListOrdered, 
 import { listSubflows, listSubflowVersions } from "@/services/subflows";
 import { listLogicAssets, listLogicVersions } from "@/services/logic";
 import { listIntegrations } from "@/services/integrations";
+import { confirmNodeDeletion, promptDialog } from "@/stores/dialog-store";
 import { useFlowStore } from "@/stores/flow-store";
 import { richTextToPlainText, richTextToSafeHtml } from "@/components/content/RichText";
 import type { IntegrationConnection, LogicAssetRecord, LogicVersion, SubflowRecord, SubflowVersion } from "@/types/api";
@@ -303,21 +304,26 @@ export function PropertiesPanel() {
     syncLabelFromEditor();
   };
 
-  const applyLabelLink = () => {
+  const applyLabelLink = async () => {
     restoreLabelSelection();
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim()) {
       setLabelMediaError("Select the text you want to turn into a link.");
       return;
     }
-    const entered = window.prompt("Enter the link URL", "https://");
-    if (!entered) return;
-    const candidate = /^(?:https?:\/\/|mailto:|tel:)/i.test(entered) ? entered : `https://${entered}`;
-    const url = safeEditorLink(candidate);
-    if (!url) {
-      setLabelMediaError("Use an HTTP, HTTPS, email, or telephone link.");
-      return;
-    }
+    // The dialog takes focus, so pin the editor selection before it opens.
+    rememberLabelSelection();
+    const toLink = (entered: string) => safeEditorLink(/^(?:https?:\/\/|mailto:|tel:)/i.test(entered) ? entered : `https://${entered}`);
+    const entered = await promptDialog({
+      title: "Add link",
+      label: "Link URL",
+      defaultValue: "https://",
+      inputType: "url",
+      confirmLabel: "Add link",
+      validate: (value) => (value && value !== "https://" && toLink(value) ? null : "Use an HTTP, HTTPS, email, or telephone link."),
+    });
+    const url = entered ? toLink(entered) : null;
+    if (!url) return;
     setLabelMediaError("");
     applyLabelCommand("createLink", url);
   };
@@ -923,10 +929,10 @@ export function PropertiesPanel() {
         {node.type !== "start" ? (
           <button
             className="danger-button"
-            onClick={() => {
+            onClick={async () => {
               const readableType = node.type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
               const nodeLabel = `${readableType} node${node.data.node_number ? ` #${node.data.node_number}` : ""}`;
-              if (!window.confirm(`Delete ${nodeLabel}?\n\nThis action cannot be undone.`)) return;
+              if (!(await confirmNodeDeletion(nodeLabel))) return;
               onNodesChange([{ id: node.id, type: "remove" }]);
               selectNode(null);
             }}

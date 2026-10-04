@@ -61,6 +61,7 @@ The backend runs every Alembic migration and seeds a demo account. The `integrat
 
 ```bash
 cd backend
+.venv/bin/python -m pip install -r requirements-dev.txt -c constraints.txt
 .venv/bin/python -m pytest -q
 
 cd ../frontend
@@ -73,6 +74,12 @@ docker compose exec backend python -m scripts.smoke_v2
 docker compose exec backend python -m scripts.smoke_v2b
 docker compose exec backend python -m scripts.smoke_release
 ```
+
+`backend/constraints.txt` pins the exact package versions the tests and Docker image were verified with; the requirement files keep version ranges. To upgrade, install without `-c`, rerun the checks, and refresh the file with `pip freeze`.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every push to `main` and every pull request: backend tests and migrations on an empty PostgreSQL database, frontend typecheck and build, then the four smoke scripts against a fresh Compose stack.
+
+If you run `npm run dev` on the host while the Compose frontend is also used, each keeps its own `.next` cache (the container's lives in the `frontend_next` volume), so the two no longer corrupt each other.
 
 Preview saves and cleans the current graph before it opens. Incomplete paths can be previewed while the separate **Validate** action shows every publish-blocking issue and selects the first affected node.
 
@@ -92,7 +99,7 @@ Secrets are encrypted at rest using a key derived from `SECRET_KEY` and are neve
 
 ## Environment
 
-Copy `.env.example` to `.env`. For a non-local deployment, change at least `POSTGRES_PASSWORD`, `SECRET_KEY`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`, and allowed CORS origins.
+Copy `.env.example` to `.env`. For a non-local deployment, change at least `POSTGRES_PASSWORD`, `SECRET_KEY`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`, and `CORS_ORIGINS` (a JSON list of allowed browser origins).
 
 Custom hostnames require HTTPS, routing to the deployed frontend/API, and the verification token served at `/.well-known/visual-chatbot-builder-verification`.
 

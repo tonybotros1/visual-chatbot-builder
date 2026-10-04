@@ -64,7 +64,8 @@ def main() -> None:
         bot = request("/bots", method="POST", payload={"name": f"V1 smoke {run_id}", "description": "Temporary V1 verification bot"}, token=token)
         test_bot_id = bot["id"]
         saved_flow = request(f"/bots/{test_bot_id}/flow", method="PUT", payload=DEFAULT_FLOW, token=token)
-        assert saved_flow == DEFAULT_FLOW
+        # The API also returns appearance/settings defaults added after V1; the submitted graph must round-trip intact.
+        assert {key: saved_flow.get(key) for key in DEFAULT_FLOW} == DEFAULT_FLOW
         validation = request(f"/bots/{test_bot_id}/validate", method="POST", token=token)
         assert validation["valid"] is True, validation
 
