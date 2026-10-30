@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { ExternalLink, RefreshCw, Send, Star } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { RichText } from "@/components/content/RichText";
+import { getRuntimeStrings } from "./runtime-strings";
+import { DatePicker } from "./DatePicker";
 import { answerConversation, deploymentBootstrap, startDeployment, startPreview, startPublic } from "@/services/conversations";
 import type { ConversationState, RuntimeNode } from "@/types/api";
 import { bookAppointment, completeSandboxPayment, createPayment, getPaymentStatus, listAppointmentSlots, sendOtp, uploadConversationFile, verifyOtp, type AppointmentSlot } from "@/services/providers";
@@ -42,6 +44,8 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
   const [error, setError] = useState("");
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [direction, setDirection] = useState<"ltr" | "rtl">("ltr");
+  const [activeLocale, setActiveLocale] = useState(stateLocale(locale));
+  const t = getRuntimeStrings(activeLocale);
   const [appearance, setAppearance] = useState<ConversationState["appearance"]>({});
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [runtimeSettings, setRuntimeSettings] = useState<ConversationState["settings"]>({});
@@ -80,7 +84,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
       await applyState(state, [], sequence);
     } catch (caught) {
       if (sequence === responseSequence.current) {
-        setError(caught instanceof Error ? caught.message : "Could not start conversation");
+        setError(caught instanceof Error ? caught.message : t.couldNotStart);
       }
     } finally {
       if (sequence === responseSequence.current) setBusy(false);
@@ -119,13 +123,14 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
       botMessages.push({
         id: `${state.next_node.id}-${crypto.randomUUID()}`,
         sender: "bot",
-        text: String(state.next_node.data.label ?? (state.status === "completed" ? "Conversation complete" : "Your answer")),
+        text: String(state.next_node.data.label ?? (state.status === "completed" ? t.conversationComplete : t.yourAnswer)),
         node: state.next_node,
       });
     }
     if (prefix.length) setMessages((current) => [...current, ...prefix]);
     setNode(null);
     setDirection(state.direction ?? "ltr");
+    setActiveLocale(stateLocale(state.locale));
     setAppearance(state.appearance ?? {});
     setAppearanceReady(true);
     setRuntimeSettings(state.settings ?? {});
@@ -168,7 +173,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
       setSelected([]);
     } catch (caught) {
       if (sequence === responseSequence.current) {
-        setError(caught instanceof Error ? caught.message : "Could not submit answer");
+        setError(caught instanceof Error ? caught.message : t.couldNotSubmit);
       }
     } finally {
       if (sequence === responseSequence.current) setBusy(false);
@@ -246,28 +251,30 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
     "--chat-background": appearance.background_color ?? "#FFFFFF",
     "--chat-surface": appearance.surface_color ?? "#FFFFFF",
     "--chat-text": appearance.text_color ?? "#211D29",
+    "--chat-avatar": appearance.avatar_url ? `url("${appearance.avatar_url}")` : "none",
   } as CSSProperties;
+  const isSpotlight = appearance.layout_style === "spotlight";
 
   if (!appearanceReady) {
     return (
       <section className="chat-shell chat-shell-loading" aria-busy={!error} aria-live="polite">
         <div className="chat-loading-content">
           <SpaghettiMark size={38} />
-          <strong>{error ? "Preview unavailable" : "Loading preview…"}</strong>
+          <strong>{error ? t.previewUnavailable : t.loadingPreview}</strong>
           {error ? <span>{error}</span> : null}
         </div>
       </section>
     );
   }
 
-  return (
-    <section className={`chat-shell chat-layout-${appearance.layout_style ?? "card"}`} dir={direction} lang={stateLocale(locale)} style={chatStyle}>
+  const shell = (
+    <section className={`chat-shell chat-layout-${appearance.layout_style ?? "card"}`} dir={direction} lang={activeLocale} style={chatStyle}>
       <header className="chat-header">
         <span className="chat-profile-picture">
           {appearance.avatar_url ? <img src={appearance.avatar_url} alt="Chat profile" /> : <SpaghettiMark size={31} />}
         </span>
         <div><strong>{appearance.title || title}</strong>{appearance.description ? <span>{appearance.description}</span> : null}</div>
-        <button className="icon-button" type="button" aria-label="Restart" onClick={() => void begin()}><RefreshCw size={16} /></button>
+        <button className="icon-button" type="button" aria-label={t.restart} title={t.restart} onClick={() => void begin()}><RefreshCw size={16} /></button>
       </header>
       {runtimeSettings.show_progress_bar ? (
         <div className="chat-progress" aria-label={`Conversation progress ${Math.round(progressPercent)}%`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progressPercent)}>
@@ -275,7 +282,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
         </div>
       ) : null}
       <div ref={transcriptRef} className="chat-transcript" aria-live="polite">
-        {busy && messages.length === 0 ? <p className="chat-placeholder">Starting conversation…</p> : null}
+        {busy && messages.length === 0 ? <p className="chat-placeholder">{t.starting}</p> : null}
         {messages.map((message) => (
           <div className={`chat-bubble chat-bubble-${message.sender}`} key={message.id}>
             {message.sender === "bot" ? <RichText content={message.text} /> : <span>{message.text}</span>}
@@ -311,7 +318,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
           </div>
         ))}
         {isTyping ? (
-          <div className="chat-bubble chat-bubble-bot chat-typing" aria-label="Chatbot is typing">
+          <div className="chat-bubble chat-bubble-bot chat-typing" aria-label={t.typing}>
             <span />
             <span />
             <span />
@@ -351,7 +358,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
                   void submit(selected, labels.join(", "));
                 }}
               >
-                Continue
+                {t.continue_}
               </button>
             </div>
           ) : node.type === "searchableList" ? (
@@ -360,9 +367,9 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
               const index = options.indexOf(value);
               if (index >= 0) void submit(optionValues[index] ?? value, value);
             }}>
-              <input autoFocus list={`list-${node.id}`} required={node.data.required !== false} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Search options…" />
+              <input autoFocus list={`list-${node.id}`} required={node.data.required !== false} value={value} onChange={(event) => setValue(event.target.value)} placeholder={t.searchOptions} />
               <datalist id={`list-${node.id}`}>{options.map((option) => <option value={option} key={option} />)}</datalist>
-              <button className="primary-button" disabled={busy || !options.includes(value)} type="submit" aria-label="Choose option"><Send size={16} /></button>
+              <button className="primary-button" disabled={busy || !options.includes(value)} type="submit" aria-label={t.chooseOption}><Send size={16} /></button>
             </form>
           ) : node.type === "ratingInput" || node.type === "opinionScale" ? (
             <div className={`chat-scale ${node.type === "ratingInput" ? "chat-rating" : ""}`}>
@@ -376,16 +383,29 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
             <form className="chat-range" onSubmit={(event) => { event.preventDefault(); void submit(Number(value || minimum)); }}>
               <output>{value || minimum}</output>
               <input autoFocus type="range" min={minimum} max={maximum} step={Number(node.data.step ?? 1)} value={value || minimum} onChange={(event) => setValue(event.target.value)} />
-              <button className="primary-button" disabled={busy} type="submit">Continue</button>
+              <button className="primary-button" disabled={busy} type="submit">{t.continue_}</button>
             </form>
           ) : node.type === "fileUpload" ? (
-            <label className="chat-upload">Choose {Number(node.data.max_files ?? 1) > 1 ? "files" : "a file"}<input disabled={busy} type="file" multiple={Number(node.data.max_files ?? 1) > 1} accept={(node.data.file_types ?? []).join(",")} onChange={(event) => void uploadFiles(event.target.files)} /><small>Files are size checked, scanned, and stored behind signed downloads.</small></label>
+            <label className="chat-upload">{Number(node.data.max_files ?? 1) > 1 ? t.chooseFiles : t.chooseFile}<input disabled={busy} type="file" multiple={Number(node.data.max_files ?? 1) > 1} accept={(node.data.file_types ?? []).join(",")} onChange={(event) => void uploadFiles(event.target.files)} /><small>{t.fileHint}</small></label>
           ) : node.type === "payment" ? (
-            <button className="primary-button chat-provider-action" disabled={busy} type="button" onClick={() => void pay()}>Pay {String(node.data.currency ?? "USD")} {Number(node.data.amount ?? 0).toFixed(2)}</button>
+            <button className="primary-button chat-provider-action" disabled={busy} type="button" onClick={() => void pay()}>{t.pay} {String(node.data.currency ?? "USD")} {Number(node.data.amount ?? 0).toFixed(2)}</button>
           ) : node.type === "appointment" ? (
-            <div className="chat-slots">{slots.length ? slots.slice(0, 12).map((slot) => <button disabled={busy} type="button" key={slot.starts_at} onClick={() => void reserve(slot)}><strong>{new Date(slot.starts_at).toLocaleDateString()}</strong><span>{new Date(slot.starts_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></button>) : <p>Loading available times…</p>}</div>
+            <div className="chat-slots">{slots.length ? slots.slice(0, 12).map((slot) => <button disabled={busy} type="button" key={slot.starts_at} onClick={() => void reserve(slot)}><strong>{new Date(slot.starts_at).toLocaleDateString()}</strong><span>{new Date(slot.starts_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></button>) : <p>{t.loadingTimes}</p>}</div>
+          ) : node.type === "dateInput" ? (
+            <DatePicker
+              key={node.id}
+              locale={activeLocale}
+              min={node.data.min_date}
+              max={node.data.max_date}
+              disabled={busy}
+              strings={t}
+              onSubmit={(iso) => {
+                const [year, month, day] = iso.split("-").map(Number);
+                void submit(iso, new Intl.DateTimeFormat(activeLocale, { dateStyle: "long" }).format(new Date(year, month - 1, day)));
+              }}
+            />
           ) : node.type === "phoneInput" && node.data.otp_required ? (
-            <div className="chat-otp">{otpChallengeId ? <><label>Verification code<input autoFocus inputMode="numeric" value={otpCode} onChange={(event) => setOtpCode(event.target.value)} placeholder="6-digit code" /></label>{otpDebugCode ? <small>Preview code: <strong>{otpDebugCode}</strong></small> : <small>Check your phone for the code.</small>}<button className="primary-button" disabled={busy || otpCode.length < 4} type="button" onClick={() => void confirmPhoneCode()}>Verify and continue</button><button className="secondary-button" type="button" onClick={() => { setOtpChallengeId(null); setOtpCode(""); }}>Change phone</button></> : <><label>Phone number<input autoFocus type="tel" value={value} onChange={(event) => setValue(event.target.value)} placeholder="+971…" /></label><button className="primary-button" disabled={busy || value.length < 7} type="button" onClick={() => void requestPhoneCode()}>Send verification code</button></>}</div>
+            <div className="chat-otp">{otpChallengeId ? <><label>{t.verificationCode}<input autoFocus inputMode="numeric" value={otpCode} onChange={(event) => setOtpCode(event.target.value)} placeholder={t.codePlaceholder} /></label>{otpDebugCode ? <small>{t.previewCode} <strong>{otpDebugCode}</strong></small> : <small>{t.checkPhone}</small>}<button className="primary-button" disabled={busy || otpCode.length < 4} type="button" onClick={() => void confirmPhoneCode()}>{t.verifyContinue}</button><button className="secondary-button" type="button" onClick={() => { setOtpChallengeId(null); setOtpCode(""); }}>{t.changePhone}</button></> : <><label>{t.phoneNumber}<input autoFocus type="tel" value={value} onChange={(event) => setValue(event.target.value)} placeholder={t.phonePlaceholder} /></label><button className="primary-button" disabled={busy || value.length < 7} type="button" onClick={() => void requestPhoneCode()}>{t.sendCode}</button></>}</div>
           ) : (
             <form onSubmit={(event) => { event.preventDefault(); void submit(value); }}>
               <input
@@ -397,9 +417,9 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
                 step={node.type === "numberInput" ? node.data.step : undefined}
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
-                placeholder="Type your answer…"
+                placeholder={t.typeAnswer}
               />
-              <button className="primary-button" disabled={busy} type="submit" aria-label="Send answer"><Send size={16} /></button>
+              <button className="primary-button" disabled={busy} type="submit" aria-label={t.sendAnswer}><Send size={16} /></button>
             </form>
           )}
           {node.data.required === false ? (
@@ -407,13 +427,16 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
               className="chat-skip-button"
               disabled={busy}
               type="button"
-              onClick={() => void submit(null, "Skipped")}
+              onClick={() => void submit(null, t.skipped)}
             >
-              Skip
+              {t.skip}
             </button>
           ) : null}
         </div>
-      ) : messages.length > 0 && !busy ? <div className="chat-complete">Conversation complete</div> : null}
+      ) : messages.length > 0 && !busy ? <div className="chat-complete">{t.conversationComplete}</div> : null}
     </section>
   );
+
+  // Spotlight fills the page with the primary colour and centres the card on it.
+  return isSpotlight ? <div className="chat-spotlight-backdrop" style={chatStyle}>{shell}</div> : shell;
 }
