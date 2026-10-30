@@ -1,6 +1,6 @@
 :root {
-  --brand: #e84a5f;
-  --brand-dark: #cf384e;
+  --brand: #00a1b0;
+  --brand-dark: #00848f;
   --accent: #7c3aed;
   --ink: #19151e;
   --muted: #746d7d;
@@ -43,6 +43,8 @@ code { font-size: 12px; background: #f3eee4; padding: 1px 5px; border-radius: 5p
 .auth-card { display: grid; gap: 14px; width: min(400px, 100%); padding: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 60px rgba(23, 20, 29, 0.12); }
 .auth-badge { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: white; background: linear-gradient(135deg, var(--brand), var(--accent)); }
 .auth-card h1 { font-size: 24px; }
+.auth-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.auth-partner-logo { display: block; height: 44px; width: auto; }
 
 /* Forms */
 label { display: grid; gap: 6px; font-size: 13px; font-weight: 650; }

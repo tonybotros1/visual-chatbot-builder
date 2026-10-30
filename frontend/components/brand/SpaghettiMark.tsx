@@ -15,11 +15,11 @@ export function SpaghettiMark({ className = "", size = 48, title = "Spaghetti" }
       width={size}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <circle cx="10" cy="19" fill="#E84A5F" r="7" />
+      <circle cx="10" cy="19" fill="#00A1B0" r="7" />
       <path
         d="M10 19 31 7 24 35 48 21 38 53 58 39"
         fill="none"
-        stroke="#E84A5F"
+        stroke="#00A1B0"
         strokeLinecap="round"
         strokeLinejoin="miter"
         strokeWidth="7"

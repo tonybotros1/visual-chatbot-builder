@@ -41,7 +41,10 @@ export default function LoginPage() {
   return (
     <main className="auth-page">
       <form className="auth-card" onSubmit={submit}>
-        <span className="auth-badge"><ShieldCheck size={22} /></span>
+        <div className="auth-brand-row">
+          <span className="auth-badge"><ShieldCheck size={22} /></span>
+          <img className="auth-partner-logo" src="/manzil-logo.png" alt="Manzil Healthcare Services" width={1703} height={707} />
+        </div>
         <p className="eyebrow">Spaghetti</p>
         <h1>Admin console</h1>
         <p className="muted">Platform administrators only. Builders sign in to the main app instead.</p>
