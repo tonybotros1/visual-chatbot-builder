@@ -73,13 +73,26 @@ class LogicEvaluationResponse(BaseModel):
     trace: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ScenarioExpectation(BaseModel):
+    """What a saved scenario asserts after it runs. Unknown keys are rejected so typos cannot silently pass."""
+
+    model_config = {"extra": "forbid"}
+
+    status: Literal["completed", "active", "missing_answer", "step_limit", "error"] | None = None
+    terminal_node_id: str | None = None
+    variables: dict[str, Any] = Field(default_factory=dict)
+
+
 class ScenarioCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     answers: dict[str, Any] = Field(default_factory=dict)
+    expected: ScenarioExpectation = Field(default_factory=ScenarioExpectation)
+
+
+class ScenarioRead(BaseModel):
+    name: str
+    answers: dict[str, Any] = Field(default_factory=dict)
     expected: dict[str, Any] = Field(default_factory=dict)
-
-
-class ScenarioRead(ScenarioCreate):
     id: UUID
     bot_id: UUID
     created_at: datetime

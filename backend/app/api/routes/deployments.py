@@ -25,6 +25,7 @@ from app.models.deployment import CustomDomain, Deployment, TargetSegment
 from app.models.user import User
 from app.schemas.conversation import ConversationStart, ConversationState
 from app.schemas.deployment import (
+    rules_dict,
     DeploymentBootstrap,
     DeploymentCreate,
     DeploymentRead,
@@ -160,7 +161,7 @@ def create_segment(
     while db.scalar(select(TargetSegment.id).where(TargetSegment.slug == slug)):
         slug = f"{base}-{counter}"
         counter += 1
-    segment = TargetSegment(user_id=user.id, name=payload.name.strip(), slug=slug, rules=payload.rules)
+    segment = TargetSegment(user_id=user.id, name=payload.name.strip(), slug=slug, rules=rules_dict(payload.rules))
     db.add(segment)
     db.commit()
     db.refresh(segment)
@@ -228,7 +229,7 @@ def create_deployment(
         mode=payload.mode,
         environment=payload.environment,
         config=payload.config,
-        rules=payload.rules,
+        rules=rules_dict(payload.rules),
     )
     db.add(deployment)
     db.commit()
@@ -313,7 +314,7 @@ def verify_domain(domain_id: UUID, user: Annotated[User, Depends(get_current_use
         _ensure_public_destination(url)
         with urlopen(UrlRequest(url, headers={"User-Agent": "VisualChatbotBuilder/2"}), timeout=10) as response:
             value = response.read(500).decode().strip()
-    except (ValueError, HTTPError, URLError) as exc: raise HTTPException(status_code=422, detail=f"Domain verification failed: {exc}") from exc
+    except (ValueError, HTTPError, URLError, OSError, TimeoutError) as exc: raise HTTPException(status_code=422, detail=f"Domain verification failed: {exc}") from exc
     if value != item.verification_token: raise HTTPException(status_code=422, detail="Verification file did not contain the expected token")
     item.status = "verified"; item.verified_at = datetime.now(UTC); db.commit(); db.refresh(item); return item
 

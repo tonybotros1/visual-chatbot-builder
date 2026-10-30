@@ -48,6 +48,11 @@ def validate_flow(
             )
         data = node.get("data", {})
         variable = str(data.get("variable", "")).strip()
+        if node.get("type") in {"ruleSet", "decisionTable", "subflow"}:
+            # Output mappings write parent variables too, so later conditions may reference them.
+            for parent_name in (data.get("outputs") or {}).values():
+                if str(parent_name).strip():
+                    defined_variables.add(str(parent_name).strip())
         if variable and node.get("type") in input_types | {"setVariable"}:
             variables[variable].append(str(node.get("id")))
             defined_variables.add(variable)

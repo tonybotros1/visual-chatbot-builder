@@ -21,7 +21,7 @@ DEFAULT_FLOW = {
             "id": "start",
             "type": "start",
             "position": {"x": 80, "y": 220},
-            "data": {"label": "Start"},
+            "data": {"label": "Start", "node_number": 1},
         },
         {
             "id": "welcome-message",
@@ -30,6 +30,7 @@ DEFAULT_FLOW = {
             "data": {
                 "label": "Welcome! Let's check your eligibility.",
                 "description": "A short opening message before the first question.",
+                "node_number": 2,
             },
         },
         {
@@ -40,19 +41,20 @@ DEFAULT_FLOW = {
                 "label": "Would you like to continue?",
                 "variable": "continue_choice",
                 "options": ["Yes", "No"],
+                "node_number": 3,
             },
         },
         {
             "id": "yes-end",
             "type": "end",
             "position": {"x": 1020, "y": 95},
-            "data": {"label": "Continue path complete"},
+            "data": {"label": "Continue path complete", "node_number": 4},
         },
         {
             "id": "no-end",
             "type": "end",
             "position": {"x": 1020, "y": 330},
-            "data": {"label": "Conversation ended"},
+            "data": {"label": "Conversation ended", "node_number": 5},
         },
     ],
     "edges": [

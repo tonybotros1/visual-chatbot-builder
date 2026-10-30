@@ -11,6 +11,8 @@ from app.engine.subflows import (
     advance_runtime,
     apply_runtime_answer,
     initial_runtime_state,
+    direction_for_locale,
+    locale_code_from_answer,
 )
 from app.models.bot import BotVersion
 from app.models.conversation import Conversation, ConversationAnswer
@@ -42,10 +44,12 @@ def start_conversation(
     locale_record = db.scalar(select(BotLocale).where(BotLocale.bot_id == version.bot_id, BotLocale.locale == locale.lower())) if locale else None
     if locale_record is None:
         locale_record = db.scalar(select(BotLocale).where(BotLocale.bot_id == version.bot_id, BotLocale.is_default.is_(True)))
+    # A requested locale without a catalog still gets its natural direction (e.g. ?lang=ar is RTL).
+    requested_code = locale_code_from_answer(locale) if locale else None
     runtime_state = initial_runtime_state(
         str(version.id), start_nodes[0]["id"], debug=debug,
-        locale=locale_record.locale if locale_record else (locale or "en"),
-        direction=locale_record.direction if locale_record else "ltr",
+        locale=locale_record.locale if locale_record else (requested_code or "en"),
+        direction=locale_record.direction if locale_record else direction_for_locale(requested_code or "en"),
         translations=locale_record.translations if locale_record else {},
     )
     result = advance_runtime(_flow_loader(db), runtime_state, _logic_loader(db))
@@ -98,12 +102,22 @@ def submit_answer(
         ]
     }
     loader = _flow_loader(db)
+    previous_locale = str((conversation.runtime_state or {}).get("locale") or "")
     runtime_state, variable_name, normalized = apply_runtime_answer(
         loader,
         runtime_state,
         node_id,
         value,
     )
+    if str(runtime_state.get("locale") or "") != previous_locale:
+        # The language question switched locale: overlay the bot's catalog for it when one exists.
+        locale_record = db.scalar(
+            select(BotLocale).where(BotLocale.bot_id == version.bot_id, BotLocale.locale == str(runtime_state["locale"]).lower())
+        )
+        if locale_record is not None:
+            runtime_state["locale"] = locale_record.locale
+            runtime_state["direction"] = locale_record.direction
+            runtime_state["translations"] = locale_record.translations or {}
     db.add(
         ConversationAnswer(
             conversation_id=conversation.id,

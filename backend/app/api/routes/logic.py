@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.database.session import get_db
+from app.engine.executor import EngineError
 from app.engine.logic import LoadedLogic, evaluate_logic, validate_logic_definition
 from app.models.logic import LogicAsset, LogicAssetVersion
 from app.models.user import User
@@ -200,17 +201,20 @@ def evaluate_logic_asset(
 ) -> LogicEvaluationResponse:
     asset = owned_logic_asset(asset_id, user, db)
     draft = _draft(asset_id, user, db)
-    evaluation = evaluate_logic(
-        LoadedLogic(
-            kind=asset.kind,
-            version_id=str(draft.id),
-            definition=draft.definition,
-            input_schema=draft.input_schema or {},
-            output_schema=draft.output_schema or {},
-            published=False,
-        ),
-        payload.facts,
-    )
+    try:
+        evaluation = evaluate_logic(
+            LoadedLogic(
+                kind=asset.kind,
+                version_id=str(draft.id),
+                definition=draft.definition,
+                input_schema=draft.input_schema or {},
+                output_schema=draft.output_schema or {},
+                published=False,
+            ),
+            payload.facts,
+        )
+    except EngineError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     return LogicEvaluationResponse(
         outputs=evaluation.outputs,
         matched=evaluation.matched,

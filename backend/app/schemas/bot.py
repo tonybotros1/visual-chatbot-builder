@@ -13,6 +13,8 @@ class BotUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=160)
     description: str | None = Field(default=None, max_length=1000)
     status: str | None = None
+    # Public link slug; letters, digits and dashes. Renaming a bot no longer changes it.
+    slug: str | None = Field(default=None, min_length=2, max_length=160)
 
 
 class BotRead(BaseModel):

@@ -56,7 +56,7 @@ def create_scenario(
         bot_id=bot_id,
         name=payload.name.strip(),
         answers=payload.answers,
-        expected=payload.expected,
+        expected=payload.expected.model_dump(exclude_none=True),
     )
     db.add(scenario)
     db.commit()
@@ -83,7 +83,7 @@ def update_scenario(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
     scenario.name = payload.name.strip()
     scenario.answers = payload.answers
-    scenario.expected = payload.expected
+    scenario.expected = payload.expected.model_dump(exclude_none=True)
     db.commit()
     db.refresh(scenario)
     return scenario

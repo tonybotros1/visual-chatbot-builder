@@ -27,13 +27,19 @@ def owned_bot(bot_id: UUID, user: User, db: Session, minimum_role: str = "viewer
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found")
     if bot.user_id != user.id:
         collaborator = db.scalar(select(BotCollaborator).where(BotCollaborator.bot_id == bot_id, BotCollaborator.user_id == user.id))
-        if collaborator is None or ROLE_RANK.get(collaborator.role, 0) < ROLE_RANK.get(minimum_role, 1):
+        if collaborator is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found")
+        if ROLE_RANK.get(collaborator.role, 0) < ROLE_RANK.get(minimum_role, 1):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"This action needs the {minimum_role} role")
     return bot
 
 
+def normalize_slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:160]
+
+
 def unique_slug(name: str, db: Session, *, bot_id: UUID | None = None) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "bot"
+    base = normalize_slug(name) or "bot"
     slug = base
     counter = 2
     while db.scalar(select(Bot.id).where(Bot.slug == slug, Bot.id != bot_id)):
@@ -101,8 +107,15 @@ def update_bot(
 ) -> Bot:
     bot = owned_bot(bot_id, user, db, "admin")
     if payload.name is not None:
+        # The public link stays stable on rename; the slug only changes when set explicitly.
         bot.name = payload.name.strip()
-        bot.slug = unique_slug(bot.name, db, bot_id=bot.id)
+    if payload.slug is not None:
+        slug = normalize_slug(payload.slug)
+        if len(slug) < 2:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The link must contain at least two letters or numbers")
+        if db.scalar(select(Bot.id).where(Bot.slug == slug, Bot.id != bot.id)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This link is already used by another bot")
+        bot.slug = slug
     if payload.description is not None:
         bot.description = payload.description
     if payload.status in {"draft", "published", "archived"}:
@@ -120,4 +133,6 @@ def archive_bot(
 ) -> None:
     bot = owned_bot(bot_id, user, db, "admin")
     bot.status = "archived"
+    # Release the public link so a replacement bot can reuse it.
+    bot.slug = unique_slug(f"{bot.slug}-archived", db, bot_id=bot.id)
     db.commit()

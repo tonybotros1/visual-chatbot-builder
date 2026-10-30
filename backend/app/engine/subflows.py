@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -38,6 +39,55 @@ class RuntimeAdvanceResult:
 
 FlowLoader = Callable[[str, str], LoadedFlow]
 LogicLoader = Callable[[str, str], LoadedLogic]
+
+# A choice node that stores the visitor's language switches the conversation locale.
+LOCALE_VARIABLES = {"language", "locale", "preferred_language"}
+RTL_LOCALES = {"ar", "he", "fa", "ur", "ps", "sd", "ug", "yi"}
+LOCALE_ALIASES = {
+    "english": "en", "الإنجليزية": "en", "انجليزي": "en",
+    "arabic": "ar", "العربية": "ar", "عربي": "ar", "عربى": "ar",
+    "french": "fr", "français": "fr", "spanish": "es", "español": "es",
+    "german": "de", "deutsch": "de", "turkish": "tr", "türkçe": "tr",
+    "urdu": "ur", "اردو": "ur", "hindi": "hi", "हिन्दी": "hi",
+}
+
+
+def locale_code_from_answer(value: Any) -> str | None:
+    """Turn a stored answer such as "ar", "en-GB", "Arabic" or "العربية" into a locale code."""
+    text = str(value or "").strip().lower()
+    if not text:
+        return None
+    text = LOCALE_ALIASES.get(text, text).replace("_", "-")
+    # BCP-47 style: a 2-3 letter language, optionally one region/script subtag (en, ar, en-gb, zh-hant).
+    if not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]{2,8})?", text):
+        return None
+    return text
+
+
+def direction_for_locale(code: str | None) -> str:
+    return "rtl" if code and code.split("-")[0].lower() in RTL_LOCALES else "ltr"
+
+
+def is_locale_switch_node(node: dict[str, Any]) -> bool:
+    data = node.get("data") or {}
+    if data.get("switch_locale") is True:
+        return True
+    variable = str(data.get("variable") or "").strip().lower()
+    return variable in LOCALE_VARIABLES and node.get("type") in {"singleChoice", "choice", "searchableList"}
+
+
+def apply_locale_switch(state: dict[str, Any], node: dict[str, Any], value: Any) -> str | None:
+    """Switch the runtime locale when a language question is answered; returns the new code."""
+    if not is_locale_switch_node(node):
+        return None
+    code = locale_code_from_answer(value)
+    if not code:
+        return None
+    state["locale"] = code
+    state["direction"] = direction_for_locale(code)
+    # Catalog translations belong to the previous locale; the service overlays the new catalog if one exists.
+    state["translations"] = {}
+    return code
 
 
 def initial_runtime_state(version_id: str, start_node_id: str, *, debug: bool = False, locale: str = "en", direction: str = "ltr", translations: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -245,6 +295,7 @@ def apply_runtime_answer(
     normalized = validate_answer(node, value)
     variable_name = str(node.get("data", {}).get("variable") or node_id)
     frame.setdefault("variables", {})[variable_name] = normalized
+    apply_locale_switch(state, node, normalized)
     _trace(
         state,
         frame,

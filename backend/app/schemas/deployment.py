@@ -5,14 +5,59 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class TargetingCondition(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    field: str = Field(min_length=1, max_length=80)
+    operator: str = Field(default="equals", max_length=20)
+    value: Any = None
+
+
+class TargetingGroup(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    combinator: Literal["all", "any"] = "all"
+    conditions: list[TargetingCondition] = Field(default_factory=list)
+    groups: list["TargetingGroup"] = Field(default_factory=list)
+    not_: bool | None = Field(default=None, alias="not")
+
+
+class TargetingSchedule(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    starts_at: str | None = None
+    ends_at: str | None = None
+
+
+class TargetingFrequency(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    max_impressions: int | None = Field(default=None, ge=1)
+    once_per_session: bool | None = None
+
+
+class TargetingRules(BaseModel):
+    """Audience rules as evaluate_targeting reads them; unknown keys are rejected so a typo cannot silently match everyone."""
+
+    model_config = {"extra": "forbid", "populate_by_name": True}
+
+    schedule: TargetingSchedule | None = None
+    frequency: TargetingFrequency | None = None
+    match: TargetingGroup | None = None
+
+
+def rules_dict(rules: "TargetingRules | None") -> dict[str, Any]:
+    return rules.model_dump(exclude_none=True, by_alias=True) if rules else {}
+
+
 class TargetSegmentCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
-    rules: dict[str, Any] = Field(default_factory=dict)
+    rules: TargetingRules = Field(default_factory=TargetingRules)
 
 
 class TargetSegmentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=160)
-    rules: dict[str, Any] | None = None
+    rules: TargetingRules | None = None
     status: Literal["active", "archived"] | None = None
 
 
@@ -34,7 +79,7 @@ class DeploymentCreate(BaseModel):
     environment: Literal["development", "staging", "production"] = "production"
     target_segment_id: UUID | None = None
     config: dict[str, Any] = Field(default_factory=dict)
-    rules: dict[str, Any] = Field(default_factory=dict)
+    rules: TargetingRules = Field(default_factory=TargetingRules)
 
 
 class DeploymentUpdate(BaseModel):

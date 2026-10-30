@@ -27,6 +27,7 @@ from app.models.conversation import Conversation
 from app.models.integration import IntegrationConnection
 from app.models.provider import AppointmentReservation, PaymentTransaction, StoredFile
 from app.models.provider import OtpChallenge
+from app.models.subflow import SubflowVersion
 from app.services.secret_vault import decrypt_secrets
 from app.services.integrations import _ensure_public_destination
 
@@ -34,14 +35,30 @@ from app.services.integrations import _ensure_public_destination
 TOKEN_ALGORITHM = "HS256"
 
 
+def current_flow_node(db: Session, conversation: Conversation, node_id: str) -> dict[str, Any] | None:
+    """Find the node the conversation is waiting on, looking inside the active subflow frame when there is one."""
+    frames = (conversation.runtime_state or {}).get("frames") or []
+    frame = frames[-1] if frames else None
+    nodes: list[dict[str, Any]] = []
+    if frame and frame.get("kind") == "subflow":
+        try:
+            version = db.get(SubflowVersion, UUID(str(frame.get("version_id"))))
+        except ValueError:
+            version = None
+        nodes = version.flow_json.get("nodes", []) if version else []
+    else:
+        version = db.get(BotVersion, conversation.bot_version_id)
+        if version is None:
+            raise EngineError("Conversation version is unavailable")
+        nodes = version.flow_json.get("nodes", [])
+    return next((item for item in nodes if item.get("id") == node_id), None)
+
+
 def current_provider_node(db: Session, conversation_id: UUID, node_id: str, expected_type: str) -> tuple[Conversation, dict[str, Any]]:
     conversation = db.get(Conversation, conversation_id)
     if conversation is None or conversation.status != "active" or conversation.current_node_id != node_id:
         raise EngineError("Provider action is not available for this conversation")
-    version = db.get(BotVersion, conversation.bot_version_id)
-    if version is None:
-        raise EngineError("Conversation version is unavailable")
-    node = next((item for item in version.flow_json.get("nodes", []) if item.get("id") == node_id), None)
+    node = current_flow_node(db, conversation, node_id)
     if node is None or node.get("type") != expected_type:
         raise EngineError(f"Current node is not a {expected_type} node")
     return conversation, node
@@ -435,8 +452,7 @@ def _otp_hash(code: str) -> str:
 
 
 def provider_answer_value(db: Session, conversation: Conversation, node_id: str, value: Any) -> Any:
-    version = db.get(BotVersion, conversation.bot_version_id)
-    node = next((item for item in (version.flow_json.get("nodes", []) if version else []) if item.get("id") == node_id), None)
+    node = current_flow_node(db, conversation, node_id)
     if node is None: raise EngineError("Provider node is unavailable")
     if value in (None, "", []) and node.get("data", {}).get("required", True) is False:
         return value
