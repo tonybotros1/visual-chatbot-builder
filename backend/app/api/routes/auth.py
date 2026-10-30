@@ -32,6 +32,8 @@ def login(payload: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> Tok
     user = db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is disabled")
     return TokenResponse(access_token=create_access_token(user.id), user=UserRead.model_validate(user))
 
 

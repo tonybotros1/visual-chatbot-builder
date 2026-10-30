@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, bots, conversations, deployments, flows, health, integrations, localization, logic, providers, quality, subflows, teams
+from app.api.routes import admin, auth, bots, conversations, deployments, flows, health, integrations, localization, logic, providers, quality, subflows, teams
 
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(bots.router, prefix="/bots", tags=["bots"])
 api_router.include_router(flows.router, prefix="/bots", tags=["flows"])
 api_router.include_router(subflows.router, prefix="/subflows", tags=["subflows"])

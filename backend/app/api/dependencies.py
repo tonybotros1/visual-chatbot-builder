@@ -24,5 +24,13 @@ def get_current_user(
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is disabled")
+    return user
+
+
+def get_super_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
+    if user.role != "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform admin access required")
     return user
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -10,12 +11,16 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import delete
 
+from app.config import get_settings
 from app.database.session import SessionLocal
 from app.models.bot import Bot
 from app.database.seed import DEFAULT_FLOW
 
 
 API_URL = "http://127.0.0.1:8000/api"
+# Smoke runs sign in as the platform super admin configured for the stack (see .env.example).
+SMOKE_EMAIL = os.environ.get("SMOKE_EMAIL") or get_settings().super_admin_email
+SMOKE_PASSWORD = os.environ.get("SMOKE_PASSWORD") or get_settings().super_admin_password
 FRONTEND_URL = "http://frontend:3000/login"
 
 
@@ -53,10 +58,10 @@ def main() -> None:
     login = request(
         "/auth/login",
         method="POST",
-        payload={"email": "demo@example.com", "password": "demo1234"},
+        payload={"email": SMOKE_EMAIL, "password": SMOKE_PASSWORD},
     )
     token = login["access_token"]
-    assert login["user"]["email"] == "demo@example.com"
+    assert login["user"]["email"] == SMOKE_EMAIL.lower()
     assert request("/auth/me", token=token)["id"] == login["user"]["id"]
 
     test_bot_id: str | None = None

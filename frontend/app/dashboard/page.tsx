@@ -33,6 +33,11 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    // The builder sends people here when a bot URL is not theirs; read the query directly so this static page needs no Suspense boundary.
+    if (new URLSearchParams(window.location.search).get("notice") === "bot-unavailable") {
+      setError("That bot was not found or belongs to another account.");
+      window.history.replaceState(null, "", "/dashboard");
+    }
     void refresh();
   }, []);
 

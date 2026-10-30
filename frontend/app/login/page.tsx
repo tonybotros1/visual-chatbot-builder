@@ -8,8 +8,8 @@ import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("demo@example.com");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -38,7 +38,6 @@ export default function LoginPage() {
         <label>Password<input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         {error ? <div className="form-error">{error}</div> : null}
         <button className="primary-button" disabled={busy} type="submit">{busy ? "Signing in…" : "Sign in"}</button>
-        <small>Demo: demo@example.com / demo1234</small>
         <Link href="/register">Create an account</Link>
       </form>
     </main>

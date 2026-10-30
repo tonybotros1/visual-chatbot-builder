@@ -176,8 +176,14 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
       setSaveState("saved");
       setMessage("Draft loaded from PostgreSQL");
     } catch (caught) {
-      if (caught && typeof caught === "object" && "status" in caught && caught.status === 401) {
+      const status = caught && typeof caught === "object" && "status" in caught ? caught.status : undefined;
+      if (status === 401) {
         router.replace("/login");
+        return;
+      }
+      if (status === 403 || status === 404) {
+        // The bot exists under another account or not at all; never show the demo graph as if it were this bot.
+        router.replace("/dashboard?notice=bot-unavailable");
         return;
       }
       setSaveState(local ? "local" : "error");

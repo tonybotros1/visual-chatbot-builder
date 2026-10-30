@@ -28,10 +28,11 @@ def create_locale(bot_id: UUID, payload: BotLocaleCreate, user: Annotated[User, 
     locale = payload.locale.replace("_", "-").lower()
     if db.scalar(select(BotLocale.id).where(BotLocale.bot_id == bot_id, BotLocale.locale == locale)):
         raise HTTPException(status_code=409, detail="This locale already exists")
-    if payload.is_default or not db.scalar(select(BotLocale.id).where(BotLocale.bot_id == bot_id)):
-        db.execute(update(BotLocale).where(BotLocale.bot_id == bot_id).values(is_default=False)); is_default = True
-    else: is_default = False
-    item = BotLocale(bot_id=bot_id, locale=locale, name=payload.name.strip(), direction=payload.direction, translations=payload.translations, is_default=is_default)
+    # A locale only becomes the default when the author asks; otherwise the bot keeps serving the
+    # language the flow was written in (LTR). Promoting the first locale automatically flipped
+    # English bots to RTL as soon as an Arabic catalog was added.
+    if payload.is_default: db.execute(update(BotLocale).where(BotLocale.bot_id == bot_id).values(is_default=False))
+    item = BotLocale(bot_id=bot_id, locale=locale, name=payload.name.strip(), direction=payload.direction, translations=payload.translations, is_default=payload.is_default)
     db.add(item); db.commit(); db.refresh(item); return item
 
 
@@ -51,5 +52,5 @@ def delete_locale(bot_id: UUID, locale_id: UUID, user: Annotated[User, Depends(g
     owned_bot(bot_id, user, db, "editor")
     item = db.scalar(select(BotLocale).where(BotLocale.id == locale_id, BotLocale.bot_id == bot_id))
     if item is None: raise HTTPException(status_code=404, detail="Locale not found")
-    if item.is_default: raise HTTPException(status_code=409, detail="Choose another default locale before deleting this one")
+    # Deleting the default locale is allowed: the runtime then falls back to the flow's own language.
     db.delete(item); db.commit()

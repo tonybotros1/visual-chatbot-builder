@@ -8,6 +8,9 @@ __pycache__/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+admin/node_modules/
+admin/.next/
+admin/out/
 *.tsbuildinfo
 
 backend/.venv/

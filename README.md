@@ -50,12 +50,15 @@ Open:
 - Demo builder: http://localhost:3000/bots/00000000-0000-0000-0000-000000000002/builder
 - API docs: http://localhost:8000/docs
 
-Demo account:
+- Admin console: http://localhost:3100
 
-- Email: `demo@example.com`
-- Password: `demo1234`
+There is no built-in demo account. The platform super admin is created from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` in `.env` on startup (the password is re-applied on every start, so it can be rotated by redeploying). Builders register themselves at `/register` or are created from the admin console.
 
-The backend runs every Alembic migration and seeds a demo account. The `integration-worker` service processes notification deliveries and retries.
+The backend runs every Alembic migration and, when `SEED_DEMO_DATA=true`, seeds the sample "Eligibility demo" bot under the super admin. The `integration-worker` service processes notification deliveries and retries.
+
+## Admin console
+
+`admin/` is a separate Next.js application served from its own container on port 3100. It talks to the same API through `/api/admin/*`, which only accepts accounts with the `superadmin` role. It covers platform overview counts, builder accounts (create, disable, reset password, delete with content transfer), all bots (archive/restore, transfer owner), notification delivery retries, and the global audit log.
 
 ## Verify
 
@@ -65,6 +68,10 @@ cd backend
 .venv/bin/python -m pytest -q
 
 cd ../frontend
+npm run typecheck
+npm run build
+
+cd ../admin
 npm run typecheck
 npm run build
 

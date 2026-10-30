@@ -1,15 +1,15 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models.bot import Bot, BotVersion
 from app.models.subflow import Subflow, SubflowVersion
 from app.models.user import User
-from app.security import hash_password
+from app.security import hash_password, verify_password
 
 
-DEMO_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 DEMO_BOT_ID = UUID("00000000-0000-0000-0000-000000000002")
 DEMO_SUBFLOW_ID = UUID("00000000-0000-0000-0000-000000000003")
 DEMO_SUBFLOW_DRAFT_ID = UUID("00000000-0000-0000-0000-000000000004")
@@ -158,26 +158,40 @@ DEMO_SUBFLOW_OUTPUTS = {
 }
 
 
-def seed_development_data(session: Session) -> None:
-    user = session.get(User, DEMO_USER_ID)
+def seed_platform_admin(session: Session) -> User | None:
+    """Create or update the super admin from SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD."""
+    settings = get_settings()
+    email = settings.super_admin_email.strip().lower()
+    if not email:
+        return None
+    user = session.scalar(select(User).where(func.lower(User.email) == email))
     if user is None:
-        user = User(
-            id=DEMO_USER_ID,
-            name="Demo User",
-            email="demo@example.com",
-            password_hash=hash_password("demo1234"),
-        )
+        if not settings.super_admin_password:
+            return None
+        user = User(name=settings.super_admin_name, email=email, password_hash=hash_password(settings.super_admin_password), role="superadmin", is_active=True)
         session.add(user)
-        # Persist the parent row before creating the demo bot. The models do not
-        # define an ORM relationship, so SQLAlchemy cannot infer this insert
-        # dependency from the pending objects alone.
-        session.flush()
+    else:
+        user.role = "superadmin"
+        user.is_active = True
+        # The environment password is authoritative so a lost password can be reset by redeploying.
+        if settings.super_admin_password and not verify_password(settings.super_admin_password, user.password_hash):
+            user.password_hash = hash_password(settings.super_admin_password)
+    session.flush()
+    return user
+
+
+def seed_development_data(session: Session) -> None:
+    owner = seed_platform_admin(session)
+    if owner is None or not get_settings().seed_demo_data:
+        session.commit()
+        return
+    owner_id = owner.id
 
     bot = session.get(Bot, DEMO_BOT_ID)
     if bot is None:
         bot = Bot(
             id=DEMO_BOT_ID,
-            user_id=DEMO_USER_ID,
+            user_id=owner_id,
             name="Eligibility demo",
             slug="eligibility-demo",
             description="First V1 visual flow",
@@ -206,7 +220,7 @@ def seed_development_data(session: Session) -> None:
     if subflow is None:
         subflow = Subflow(
             id=DEMO_SUBFLOW_ID,
-            user_id=DEMO_USER_ID,
+            user_id=owner_id,
             name="Consent decision",
             slug="consent-decision",
             description="Reusable typed decision component for the V2 subflow runtime.",
