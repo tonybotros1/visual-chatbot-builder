@@ -1,7 +1,7 @@
 "use client";
 
 import type { MouseEvent, PointerEvent, ReactNode } from "react";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { confirmNodeDeletion } from "@/stores/dialog-store";
 import { useFlowStore } from "@/stores/flow-store";
 
@@ -28,6 +28,10 @@ export function NodeFrame({
 }: NodeFrameProps) {
   const onNodesChange = useFlowStore((state) => state.onNodesChange);
   const selectNode = useFlowStore((state) => state.selectNode);
+  const treeMode = useFlowStore((state) => state.layoutMode === "tree");
+  const hasChildren = useFlowStore((state) => state.edges.some((edge) => edge.source === nodeId));
+  const folded = useFlowStore((state) => state.collapsedNodeIds.includes(nodeId));
+  const toggleCollapsed = useFlowStore((state) => state.toggleCollapsed);
 
   const keepQuickActionSeparate = (event: MouseEvent | PointerEvent) => {
     event.stopPropagation();
@@ -66,6 +70,22 @@ export function NodeFrame({
         <span className="flow-node-icon">{icon}</span>
         <span className="flow-node-kind">{kind}</span>
         {nodeNumber ? <span className="flow-node-number">#{nodeNumber}</span> : null}
+        {treeMode && hasChildren ? (
+          <button
+            type="button"
+            className="node-fold nodrag nopan"
+            aria-pressed={folded}
+            aria-label={folded ? "Unfold this branch" : "Fold this branch"}
+            title={folded ? "Unfold this branch" : "Fold this branch"}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleCollapsed(nodeId);
+            }}
+            onPointerDown={keepQuickActionSeparate}
+          >
+            {folded ? <ChevronDown size={13} strokeWidth={2.4} aria-hidden /> : <ChevronUp size={13} strokeWidth={2.4} aria-hidden />}
+          </button>
+        ) : null}
       </div>
       <div className="flow-node-body">{children}</div>
     </div>

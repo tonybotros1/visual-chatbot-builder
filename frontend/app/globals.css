@@ -8292,3 +8292,241 @@ a {
 .chat-shell:has(.chat-progress):has(.chat-datepicker) {
   grid-template-rows: auto auto minmax(220px, 1fr) auto;
 }
+
+/* ------------------------------------------------------------------ */
+/* Compact canvas view: fixed-width cards, clamped text, category       */
+/* stripe, calmer hover, and selection focus.                           */
+/* ------------------------------------------------------------------ */
+.view-mode-toggle.is-on {
+  border-color: var(--brand-secondary);
+  color: var(--brand-secondary);
+  background: #f8f3ff;
+}
+
+.flow-canvas.is-compact .flow-node {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  border-left: 4px solid var(--node-accent);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(33, 29, 41, 0.08);
+}
+
+.flow-canvas.is-compact .flow-node-header {
+  height: 26px;
+  padding: 0 9px 0 8px;
+  border-top-width: 0;
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--node-accent) 8%, #fff);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+
+.flow-canvas.is-compact .flow-node-number {
+  min-width: 22px;
+  height: 18px;
+  font-size: 9px;
+}
+
+.flow-canvas.is-compact .flow-node-body {
+  padding: 8px 10px 9px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.flow-canvas.is-compact .node-rich-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.flow-canvas.is-compact .node-rich-label ul,
+.flow-canvas.is-compact .node-rich-label ol {
+  margin: 3px 0;
+  padding-inline-start: 16px;
+}
+
+.flow-canvas.is-compact .node-rich-label img,
+.flow-canvas.is-compact .flow-node-body > p {
+  display: none;
+}
+
+.flow-canvas.is-compact .choice-options {
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.flow-canvas.is-compact .choice-option {
+  min-height: 24px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.flow-canvas.is-compact .react-flow__node:hover .flow-node,
+.flow-canvas.is-compact .react-flow__node:focus-within .flow-node {
+  transform: none;
+}
+
+.flow-canvas.is-compact .react-flow:has(.react-flow__node:hover) .react-flow__node:not(:hover) .flow-node {
+  opacity: 1;
+  filter: none;
+}
+
+.flow-canvas.is-compact .react-flow__node.is-focus-dim {
+  opacity: 0.3;
+  transition: opacity 160ms ease;
+}
+
+.flow-canvas.is-compact .react-flow__edge.is-focus-dim {
+  opacity: 0.15;
+}
+
+.flow-canvas.is-compact .react-flow__edge.is-focus .react-flow__edge-path {
+  stroke: var(--brand-secondary);
+  stroke-width: 2.5;
+}
+
+.flow-canvas.is-compact .react-flow__edge.is-focus .react-flow__edge-textbg {
+  fill: #f8f3ff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tree layout: Flow | Tree switch, top-down handles, tree edges, jump  */
+/* chips and folded branches.                                           */
+/* ------------------------------------------------------------------ */
+.layout-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #e6e1e8;
+  border-radius: 9px;
+  background: #f6f3f8;
+}
+
+.layout-switch > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: #6f6778;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.layout-switch > button:hover {
+  color: var(--ink);
+}
+
+.layout-switch > button.is-active {
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(25, 21, 30, 0.1);
+  cursor: default;
+}
+
+/* Target handles move to the top centre, plain source handles to the bottom centre. Option,
+   skip and condition handles stay on the right of their rows so each branch keeps its label. */
+.flow-canvas.is-tree .flow-node .react-flow__handle-left {
+  top: -5px;
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+
+.flow-canvas.is-tree .flow-node-body > .react-flow__handle-right {
+  top: auto;
+  right: auto;
+  bottom: -5px;
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+
+.flow-canvas.is-tree .react-flow__node {
+  cursor: default;
+}
+
+.flow-canvas.is-tree .react-flow__edge.is-tree-edge .react-flow__edge-path {
+  stroke-width: 1.8;
+}
+
+.flow-canvas.is-tree .react-flow__edge.is-jump-edge .react-flow__edge-path {
+  stroke: #a39bab;
+  opacity: 0.8;
+}
+
+.tree-jump-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px 0 6px;
+  border: 1px dashed #b9b1c0;
+  border-radius: 999px;
+  color: #5c5363;
+  background: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: all;
+  white-space: nowrap;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.tree-jump-chip:hover {
+  border-color: var(--brand-secondary);
+  color: var(--brand-secondary);
+}
+
+.flow-canvas.is-tree .react-flow__node.is-collapsed .flow-node {
+  border-bottom: 3px solid var(--node-accent);
+}
+
+.flow-canvas.is-tree .react-flow__node.is-collapsed .flow-node::after {
+  content: "folded · double-click to open";
+  position: absolute;
+  left: 50%;
+  bottom: -22px;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--node-accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Tree mode: fold / unfold a branch from the node header */
+.node-fold {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--node-accent) 35%, white);
+  border-radius: 6px;
+  color: var(--node-accent);
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.node-fold:hover,
+.node-fold[aria-pressed="true"] {
+  color: #fff;
+  background: var(--node-accent);
+}

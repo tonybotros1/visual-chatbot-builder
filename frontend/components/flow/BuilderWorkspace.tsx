@@ -16,6 +16,10 @@ import {
   UsersRound,
   Languages,
   LayoutDashboard,
+  LayoutList,
+  List,
+  Network,
+  Workflow,
   ListTree,
   MoreHorizontal,
   Palette,
@@ -152,6 +156,10 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const router = useRouter();
   const getDocument = useFlowStore((state) => state.getDocument);
   const formatLayout = useFlowStore((state) => state.formatLayout);
+  const viewMode = useFlowStore((state) => state.viewMode);
+  const setViewMode = useFlowStore((state) => state.setViewMode);
+  const layoutMode = useFlowStore((state) => state.layoutMode);
+  const setLayoutMode = useFlowStore((state) => state.setLayoutMode);
   const isDirty = useFlowStore((state) => state.isDirty);
   const appearance = useFlowStore((state) => state.appearance);
   const markSaved = useFlowStore((state) => state.markSaved);
@@ -356,6 +364,19 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
         <div className="builder-actions">
           {activeTab === "questions" ? (
             <>
+              <div className="layout-switch" role="group" aria-label="Canvas layout">
+                <button type="button" className={layoutMode === "flow" ? "is-active" : ""} aria-pressed={layoutMode === "flow"} title="Flow: nodes stay where you place them" onClick={() => setLayoutMode("flow")}><Workflow size={14} /> Flow</button>
+                <button type="button" className={layoutMode === "tree" ? "is-active" : ""} aria-pressed={layoutMode === "tree"} title="Tree: a top-down hierarchy from Start; double-click a node to fold its branch" onClick={() => setLayoutMode("tree")}><Network size={14} /> Tree</button>
+              </div>
+              <button
+                className={`secondary-button compact-action view-mode-toggle${viewMode === "compact" ? " is-on" : ""}`}
+                aria-pressed={viewMode === "compact"}
+                onClick={() => setViewMode(viewMode === "compact" ? "detailed" : "compact")}
+                title={viewMode === "compact" ? "Compact view: short cards, selection focus. Click for the detailed view." : "Detailed view: full node content. Click for the compact view."}
+                type="button"
+              >
+                {viewMode === "compact" ? <List size={15} /> : <LayoutList size={15} />} {viewMode === "compact" ? "Compact" : "Detailed"}
+              </button>
               <button
                 className="secondary-button compact-action"
                 onClick={() => {

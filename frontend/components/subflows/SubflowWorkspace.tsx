@@ -10,6 +10,10 @@ import {
   ChevronRight,
   Home,
   FileJson2,
+  LayoutList,
+  List,
+  Network,
+  Workflow,
   Save,
   Search,
   Send,
@@ -55,6 +59,10 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
   const [contractDirty, setContractDirty] = useState(false);
   const [showContract, setShowContract] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const viewMode = useFlowStore((state) => state.viewMode);
+  const setViewMode = useFlowStore((state) => state.setViewMode);
+  const layoutMode = useFlowStore((state) => state.layoutMode);
+  const setLayoutMode = useFlowStore((state) => state.setLayoutMode);
 
   // Result messages flash in the status pill for a few seconds; routine load/save messages stay quiet.
   useEffect(() => {
@@ -190,6 +198,11 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
           <input aria-label="Search nodes" placeholder="Search component…" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
         </label>
         <div className="builder-actions">
+          <div className="layout-switch" role="group" aria-label="Canvas layout">
+            <button type="button" className={layoutMode === "flow" ? "is-active" : ""} aria-pressed={layoutMode === "flow"} title="Flow: nodes stay where you place them" onClick={() => setLayoutMode("flow")}><Workflow size={14} /> Flow</button>
+            <button type="button" className={layoutMode === "tree" ? "is-active" : ""} aria-pressed={layoutMode === "tree"} title="Tree: a top-down hierarchy from Start; double-click a node to fold its branch" onClick={() => setLayoutMode("tree")}><Network size={14} /> Tree</button>
+          </div>
+          <button className={`secondary-button compact-action view-mode-toggle${viewMode === "compact" ? " is-on" : ""}`} aria-pressed={viewMode === "compact"} onClick={() => setViewMode(viewMode === "compact" ? "detailed" : "compact")} type="button">{viewMode === "compact" ? <List size={15} /> : <LayoutList size={15} />} {viewMode === "compact" ? "Compact" : "Detailed"}</button>
           <button className="secondary-button compact-action" onClick={() => setShowContract(true)} type="button"><FileJson2 size={15} /> Contract</button>
           <button className="secondary-button compact-action" onClick={() => void handleValidate()} type="button"><CheckCircle2 size={15} /> Validate</button>
           <button className="secondary-button compact-action" onClick={() => void handlePublish()} type="button"><Send size={15} /> Publish version</button>

@@ -13,9 +13,12 @@ import {
   type EdgeTypes,
   type NodeTypes,
 } from "@xyflow/react";
-import { useFlowStore } from "@/stores/flow-store";
+import { CANVAS_LAYOUT_KEY, CANVAS_VIEW_KEY, useFlowStore } from "@/stores/flow-store";
+import { buildTreeLayout, edgeKey } from "./tree-layout";
+import { TreeEdge } from "@/components/edges/TreeEdge";
+import { JumpStubEdge } from "@/components/edges/JumpStubEdge";
 import { richTextToPlainText } from "@/components/content/RichText";
-import type { BuilderNode, BuilderNodeType } from "@/types/flow";
+import type { BuilderEdge, BuilderNode, BuilderNodeType } from "@/types/flow";
 import { ChoiceNode } from "@/components/nodes/ChoiceNode";
 import { ConditionNode } from "@/components/nodes/ConditionNode";
 import { EndNode } from "@/components/nodes/EndNode";
@@ -60,6 +63,8 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = {
   obstacle: ObstacleAwareEdge,
+  tree: TreeEdge,
+  jump: JumpStubEdge,
 };
 
 function nodeMatchesQuery(node: BuilderNode, query: string) {
@@ -108,8 +113,56 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   const onConnect = useFlowStore((state) => state.onConnect);
   const addNode = useFlowStore((state) => state.addNode);
   const selectNode = useFlowStore((state) => state.selectNode);
+  const selectedNodeId = useFlowStore((state) => state.selectedNodeId);
+  const viewMode = useFlowStore((state) => state.viewMode);
+  const setViewMode = useFlowStore((state) => state.setViewMode);
+  const layoutMode = useFlowStore((state) => state.layoutMode);
+  const setLayoutMode = useFlowStore((state) => state.setLayoutMode);
+  const collapsedNodeIds = useFlowStore((state) => state.collapsedNodeIds);
+  const toggleCollapsed = useFlowStore((state) => state.toggleCollapsed);
   const { fitView, screenToFlowPosition, setCenter } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
+
+  // The canvas view is a per-browser preference; read it after mount so server and client markup match.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(CANVAS_VIEW_KEY);
+      if (saved === "compact" || saved === "detailed") setViewMode(saved);
+      const savedLayout = window.localStorage.getItem(CANVAS_LAYOUT_KEY);
+      if (savedLayout === "tree" || savedLayout === "flow") setLayoutMode(savedLayout);
+    } catch {
+      // Storage unavailable: stay on the default view.
+    }
+  }, [setLayoutMode, setViewMode]);
+
+  // Tree layout: computed from the graph and the folded branches; saved positions are left untouched.
+  const tree = useMemo(
+    () => (layoutMode === "tree" ? buildTreeLayout(nodes, edges, new Set(collapsedNodeIds)) : null),
+    [collapsedNodeIds, edges, layoutMode, nodes],
+  );
+
+  // Switching layouts moves every handle, so refresh node internals and refit once.
+  useEffect(() => {
+    const first = window.requestAnimationFrame(() => {
+      useFlowStore.getState().nodes.forEach((node) => updateNodeInternals(node.id));
+      const second = window.requestAnimationFrame(() => {
+        void fitView({ padding: 0.15, duration: 450 });
+      });
+      return () => window.cancelAnimationFrame(second);
+    });
+    return () => window.cancelAnimationFrame(first);
+  }, [fitView, layoutMode, updateNodeInternals]);
+
+  // Compact view: when a node is selected, its neighbours stay sharp and everything else fades.
+  const focusIds = useMemo(() => {
+    if (viewMode !== "compact" || !selectedNodeId) return null;
+    const ids = new Set<string>([selectedNodeId]);
+    for (const edge of edges) {
+      if (edge.source === selectedNodeId) ids.add(edge.target);
+      if (edge.target === selectedNodeId) ids.add(edge.source);
+    }
+    return ids;
+  }, [edges, selectedNodeId, viewMode]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -129,9 +182,44 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   // Nodes that match the search keep full opacity and get a ring; the rest fade back.
   const displayNodes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return nodes;
-    return nodes.map((node) => ({ ...node, className: nodeMatchesQuery(node, query) ? "is-search-match" : "is-search-miss" }));
-  }, [nodes, searchQuery]);
+    const emphasis = (node: BuilderNode) => {
+      if (query) return nodeMatchesQuery(node, query) ? "is-search-match" : "is-search-miss";
+      if (focusIds) return focusIds.has(node.id) ? "is-focus" : "is-focus-dim";
+      return "";
+    };
+    if (!tree) {
+      if (!query && !focusIds) return nodes;
+      return nodes.map((node) => ({ ...node, className: emphasis(node) }));
+    }
+    return nodes.map((node) => {
+      const folded = collapsedNodeIds.includes(node.id) && (tree.childCount.get(node.id) ?? 0) > 0;
+      return {
+        ...node,
+        position: tree.positions.get(node.id) ?? node.position,
+        hidden: tree.hidden.has(node.id),
+        draggable: false,
+        className: [emphasis(node), "is-tree-node", folded ? "is-collapsed" : ""].filter(Boolean).join(" "),
+      };
+    });
+  }, [collapsedNodeIds, focusIds, nodes, searchQuery, tree]);
+
+  const displayEdges = useMemo(() => {
+    const focusClass = (edge: BuilderEdge) =>
+      focusIds && !searchQuery.trim() ? (edge.source === selectedNodeId || edge.target === selectedNodeId ? "is-focus" : "is-focus-dim") : "";
+    if (!tree) {
+      if (!focusIds || searchQuery.trim()) return edges;
+      return edges.map((edge) => ({ ...edge, className: focusClass(edge) }));
+    }
+    return edges.map((edge) => {
+      const isTreeEdge = tree.treeEdgeIds.has(edgeKey(edge));
+      return {
+        ...edge,
+        type: isTreeEdge ? "tree" : "jump",
+        hidden: tree.hidden.has(edge.source) || (isTreeEdge && tree.hidden.has(edge.target)),
+        className: [focusClass(edge), isTreeEdge ? "is-tree-edge" : "is-jump-edge"].filter(Boolean).join(" "),
+      };
+    });
+  }, [edges, focusIds, searchQuery, selectedNodeId, tree]);
 
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -164,10 +252,10 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   }, [fitView, layoutRevision, updateNodeInternals]);
 
   return (
-    <div ref={canvasRef} className="flow-canvas" onDragOver={onDragOver} onDrop={onDrop}>
+    <div ref={canvasRef} className={`flow-canvas${viewMode === "compact" ? " is-compact" : ""}${layoutMode === "tree" ? " is-tree" : ""}`} onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow
         nodes={displayNodes}
-        edges={edges}
+        edges={displayEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: "obstacle" }}
@@ -177,6 +265,10 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
         onPaneClick={() => selectNode(null)}
         onNodeClick={(_, node) => selectNode(node.id)}
         onNodeDoubleClick={(_, node) => {
+          if (layoutMode === "tree" && (tree?.childCount.get(node.id) ?? 0) > 0) {
+            toggleCollapsed(node.id);
+            return;
+          }
           if (node.type === "subflow" && node.data.subflow_id) {
             router.push(`/subflows/${node.data.subflow_id}/builder`);
           }

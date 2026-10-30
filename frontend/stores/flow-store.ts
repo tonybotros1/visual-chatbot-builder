@@ -19,6 +19,11 @@ import type {
   FlowSettings,
 } from "@/types/flow";
 
+export type CanvasViewMode = "detailed" | "compact";
+export const CANVAS_VIEW_KEY = "spaghetti:canvas-view";
+export type CanvasLayoutMode = "flow" | "tree";
+export const CANVAS_LAYOUT_KEY = "spaghetti:canvas-layout";
+
 export const defaultFlowAppearance: FlowAppearance = {
   title: "Spaghetti chatbot",
   description: "",
@@ -466,6 +471,12 @@ type FlowState = {
   selectedNodeId: string | null;
   searchQuery: string;
   layoutRevision: number;
+  /** Canvas density. "detailed" shows full node content; "compact" clamps it and focuses the selection. */
+  viewMode: CanvasViewMode;
+  /** "flow" uses saved positions; "tree" computes a top-down tree and ignores them. */
+  layoutMode: CanvasLayoutMode;
+  /** Tree-mode branches folded by the user (node ids). */
+  collapsedNodeIds: string[];
   isDirty: boolean;
   onNodesChange: (changes: NodeChange<BuilderNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<BuilderEdge>[]) => void;
@@ -482,6 +493,9 @@ type FlowState = {
   updateSettings: (updates: Partial<FlowSettings>) => void;
   selectNode: (nodeId: string | null) => void;
   setSearchQuery: (query: string) => void;
+  setViewMode: (mode: CanvasViewMode) => void;
+  setLayoutMode: (mode: CanvasLayoutMode) => void;
+  toggleCollapsed: (nodeId: string) => void;
   formatLayout: () => void;
   setGraph: (document: FlowDocument) => void;
   getDocument: () => FlowDocument;
@@ -521,6 +535,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedNodeId: null,
   searchQuery: "",
   layoutRevision: 0,
+  viewMode: "detailed",
+  layoutMode: "flow",
+  collapsedNodeIds: [],
   isDirty: false,
 
   onNodesChange: (changes) =>
@@ -632,6 +649,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setViewMode: (viewMode) => {
+    try {
+      window.localStorage.setItem(CANVAS_VIEW_KEY, viewMode);
+    } catch {
+      // Private windows may refuse storage; the choice still applies for this page.
+    }
+    set({ viewMode });
+  },
+  setLayoutMode: (layoutMode) => {
+    try {
+      window.localStorage.setItem(CANVAS_LAYOUT_KEY, layoutMode);
+    } catch {
+      // Storage unavailable: the choice still applies for this page.
+    }
+    set({ layoutMode });
+  },
+  toggleCollapsed: (nodeId) =>
+    set((state) => ({
+      collapsedNodeIds: state.collapsedNodeIds.includes(nodeId)
+        ? state.collapsedNodeIds.filter((id) => id !== nodeId)
+        : [...state.collapsedNodeIds, nodeId],
+    })),
   formatLayout: () =>
     set((state) => ({
       nodes: autoLayoutNodes(state.nodes, state.edges),
