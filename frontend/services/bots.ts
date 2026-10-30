@@ -8,7 +8,7 @@ export const createBot = (name: string, description = "") =>
     method: "POST",
     body: JSON.stringify({ name, description }),
   });
-export const updateBot = (botId: string, updates: Partial<Pick<BotRecord, "name" | "description" | "status">>) =>
+export const updateBot = (botId: string, updates: Partial<Pick<BotRecord, "name" | "description" | "status" | "slug">>) =>
   apiFetch<BotRecord>(`/bots/${botId}`, {
     method: "PUT",
     body: JSON.stringify(updates),

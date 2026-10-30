@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, type Ref } from "react";
+import { useCallback, useEffect, useMemo, type Ref } from "react";
 import { useRouter } from "next/navigation";
 import {
   Background,
@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import { useFlowStore } from "@/stores/flow-store";
 import { richTextToPlainText } from "@/components/content/RichText";
-import type { BuilderNodeType } from "@/types/flow";
+import type { BuilderNode, BuilderNodeType } from "@/types/flow";
 import { ChoiceNode } from "@/components/nodes/ChoiceNode";
 import { ConditionNode } from "@/components/nodes/ConditionNode";
 import { EndNode } from "@/components/nodes/EndNode";
@@ -62,21 +62,26 @@ const edgeTypes: EdgeTypes = {
   obstacle: ObstacleAwareEdge,
 };
 
+function nodeMatchesQuery(node: BuilderNode, query: string) {
+  const numberQuery = query.startsWith("#") ? query.slice(1) : query;
+  return richTextToPlainText(node.data.label).toLowerCase().includes(query) || String(node.data.node_number ?? "") === numberQuery;
+}
+
 const minimapColors: Record<BuilderNodeType, string> = {
   start: "#F5B942",
   message: "#38BDF8",
-  choice: "#E84A5F",
-  singleChoice: "#E84A5F",
-  multipleChoice: "#E84A5F",
-  textInput: "#E84A5F",
-  numberInput: "#E84A5F",
-  emailInput: "#E84A5F",
-  phoneInput: "#E84A5F",
-  searchableList: "#E84A5F",
-  rangeInput: "#E84A5F",
-  ratingInput: "#E84A5F",
-  opinionScale: "#E84A5F",
-  dateInput: "#E84A5F",
+  choice: "#00A1B0",
+  singleChoice: "#00A1B0",
+  multipleChoice: "#00A1B0",
+  textInput: "#00A1B0",
+  numberInput: "#00A1B0",
+  emailInput: "#00A1B0",
+  phoneInput: "#00A1B0",
+  searchableList: "#00A1B0",
+  rangeInput: "#00A1B0",
+  ratingInput: "#00A1B0",
+  opinionScale: "#00A1B0",
+  dateInput: "#00A1B0",
   fileUpload: "#38BDF8",
   payment: "#38BDF8",
   appointment: "#38BDF8",
@@ -121,14 +126,17 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
     [addNode, screenToFlowPosition],
   );
 
+  // Nodes that match the search keep full opacity and get a ring; the rest fade back.
+  const displayNodes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return nodes;
+    return nodes.map((node) => ({ ...node, className: nodeMatchesQuery(node, query) ? "is-search-match" : "is-search-miss" }));
+  }, [nodes, searchQuery]);
+
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return;
-    const numberQuery = query.startsWith("#") ? query.slice(1) : query;
-    const match = nodes.find((node) =>
-      richTextToPlainText(node.data.label).toLowerCase().includes(query) ||
-      String(node.data.node_number ?? "") === numberQuery,
-    );
+    const match = nodes.find((node) => nodeMatchesQuery(node, query));
     if (!match) return;
     void setCenter(match.position.x + 110, match.position.y + 70, {
       zoom: 1.15,
@@ -158,7 +166,7 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   return (
     <div ref={canvasRef} className="flow-canvas" onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow
-        nodes={nodes}
+        nodes={displayNodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}

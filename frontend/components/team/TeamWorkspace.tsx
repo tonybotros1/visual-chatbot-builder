@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, History, Plus, Shield, Trash2, UserRound } from "lucide-react";
 import { getBot } from "@/services/bots";
+import { confirmDialog } from "@/stores/dialog-store";
 import { inviteCollaborator, listAuditLog, listCollaborators, removeCollaborator, updateCollaborator } from "@/services/team";
 import type { AuditLogRecord, BotCollaborator } from "@/types/api";
 
@@ -40,7 +41,7 @@ export function TeamWorkspace({ botId }: { botId: string }) {
         <div><p className="eyebrow">Access control</p><h2>Collaborators</h2></div>
         <form className="invite-form" onSubmit={invite}><input type="email" required placeholder="teammate@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /><select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option></select><button className="primary-button" type="submit"><Plus size={14} /> Add</button></form>
         <p className="team-help"><Shield size={13} /> Viewers can inspect. Editors can build, test, publish, deploy, and operate responses. Admins also manage access and integrations.</p>
-        <div className="member-list">{members.map((member) => <article key={member.user_id}><UserRound size={16} /><div><strong>{member.name}</strong><small>{member.email}</small></div>{member.owner ? <span className="status-pill">Owner</span> : <select value={member.role} onChange={(event) => member.id && void updateCollaborator(botId, member.id, event.target.value as "admin" | "editor" | "viewer").then(replace)}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option></select>}{!member.owner && member.id ? <button type="button" aria-label={`Remove ${member.name}`} onClick={() => void removeCollaborator(botId, member.id!).then(() => setMembers((items) => items.filter((item) => item.id !== member.id)))}><Trash2 size={14} /></button> : null}</article>)}</div>
+        <div className="member-list">{members.map((member) => <article key={member.user_id}><UserRound size={16} /><div><strong>{member.name}</strong><small>{member.email}</small></div>{member.owner ? <span className="status-pill">Owner</span> : <select value={member.role} onChange={(event) => member.id && void updateCollaborator(botId, member.id, event.target.value as "admin" | "editor" | "viewer").then(replace)}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option></select>}{!member.owner && member.id ? <button type="button" aria-label={`Remove ${member.name}`} onClick={() => void confirmDialog({ title: `Remove ${member.name}?`, message: `${member.email} loses access to this bot immediately.`, confirmLabel: "Remove collaborator", tone: "danger" }).then((ok) => { if (ok) void removeCollaborator(botId, member.id!).then(() => setMembers((items) => items.filter((item) => item.id !== member.id))); })}><Trash2 size={14} /></button> : null}</article>)}</div>
       </section>
       <section className="team-card">
         <div><p className="eyebrow">Accountability</p><h2>Audit log</h2></div>

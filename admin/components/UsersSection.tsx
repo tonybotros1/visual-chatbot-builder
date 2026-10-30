@@ -16,6 +16,19 @@ export function UsersSection({ adminId }: { adminId: string }) {
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "user" as AdminUser["role"] });
   const { confirm, dialog } = useConfirm();
 
+  const toggleActive = async (user: AdminUser) => {
+    if (user.is_active) {
+      const ok = await confirm({
+        title: `Disable sign-in for ${user.email}?`,
+        message: "Their sessions stop working immediately and they cannot sign in until you enable the account again.",
+        confirmLabel: "Disable sign-in",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    await run(() => updateUser(user.id, { is_active: !user.is_active }), `${user.is_active ? "Disabled" : "Enabled"} ${user.email}`);
+  };
+
   const refresh = useCallback(async (q = query) => {
     try {
       setUsers(await listUsers(q));
@@ -130,7 +143,7 @@ export function UsersSection({ adminId }: { adminId: string }) {
                     {!self ? (
                       <>
                         <button type="button" className="icon-button" title={user.role === "superadmin" ? "Make builder" : "Make platform admin"} onClick={() => void run(() => updateUser(user.id, { role: user.role === "superadmin" ? "user" : "superadmin" }), `Role updated for ${user.email}`)}><ShieldCheck size={15} /></button>
-                        <button type="button" className="icon-button" title={user.is_active ? "Disable sign-in" : "Enable sign-in"} onClick={() => void run(() => updateUser(user.id, { is_active: !user.is_active }), `${user.is_active ? "Disabled" : "Enabled"} ${user.email}`)}>{user.is_active ? <UserX size={15} /> : <UserCheck size={15} />}</button>
+                        <button type="button" className="icon-button" title={user.is_active ? "Disable sign-in" : "Enable sign-in"} onClick={() => void toggleActive(user)}>{user.is_active ? <UserX size={15} /> : <UserCheck size={15} />}</button>
                         <button type="button" className="icon-button icon-button-danger" title="Delete account" onClick={() => void remove(user)}><Trash2 size={15} /></button>
                       </>
                     ) : null}

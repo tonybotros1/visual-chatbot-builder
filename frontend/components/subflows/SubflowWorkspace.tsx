@@ -7,9 +7,8 @@ import { ReactFlowProvider } from "@xyflow/react";
 import {
   Blocks,
   CheckCircle2,
-  ChevronLeft,
-  Cloud,
-  Database,
+  ChevronRight,
+  Home,
   FileJson2,
   Save,
   Search,
@@ -28,6 +27,8 @@ import {
 } from "@/services/subflows";
 import { useFlowStore } from "@/stores/flow-store";
 import type { BuilderNodeType, FactSchema, FlowDocument } from "@/types/flow";
+
+const QUIET_MESSAGES = new Set(["Loading component…", "Draft loaded from PostgreSQL", "Saving component…", "Saved to PostgreSQL", "Backend unavailable — saved in this browser", "Backend unavailable — browser draft loaded", "Could not load component"]);
 import { alertDialog } from "@/stores/dialog-store";
 
 
@@ -53,6 +54,18 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
   const [outputSchema, setOutputSchema] = useState<FactSchema>({});
   const [contractDirty, setContractDirty] = useState(false);
   const [showContract, setShowContract] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  // Result messages flash in the status pill for a few seconds; routine load/save messages stay quiet.
+  useEffect(() => {
+    if (!message || QUIET_MESSAGES.has(message)) {
+      setFlash(null);
+      return;
+    }
+    setFlash(message);
+    const timer = window.setTimeout(() => setFlash(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
 
   const loadDraft = useCallback(async () => {
     const local = window.localStorage.getItem(localStorageKey(subflowId));
@@ -149,23 +162,34 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
     addNode(type, { x: 140 + (nodes.length % 3) * 270, y: maxY + 170 });
   };
 
+  const pill: { text: string; tone: "warn" | "ok" | "neutral" | "error" | "info" } =
+    saveState === "loading" ? { text: "Loading…", tone: "neutral" }
+    : saveState === "saving" ? { text: "Saving…", tone: "info" }
+    : saveState === "error" ? { text: message, tone: "error" }
+    : saveState === "local" ? { text: "Saved in this browser only", tone: "warn" }
+    : flash ? { text: flash, tone: "info" }
+    : isDirty || contractDirty ? { text: "Unsaved changes", tone: "warn" }
+    : { text: "Saved", tone: "ok" };
+
   return (
     <main className="builder-page">
       <header className="builder-topbar">
-        <div className="builder-brand">
-          <Link href="/subflows" className="icon-button" aria-label="Back to components"><ChevronLeft size={19} /></Link>
-          <span className="brand-mark brand-mark-small"><Blocks size={18} /></span>
-          <div><strong>{name}</strong><span>Components / Draft definition</span></div>
-        </div>
+        <nav className="builder-crumbs" aria-label="Breadcrumb">
+          <Link href="/dashboard" className="crumb-home" aria-label="Dashboard" title="Dashboard"><Home size={16} /></Link>
+          <ChevronRight className="crumb-sep" size={14} aria-hidden />
+          <Link href="/subflows" className="crumb-link"><Blocks size={14} /> Components</Link>
+          <ChevronRight className="crumb-sep" size={14} aria-hidden />
+          <span className="crumb-bot" title={name}>{name}</span>
+          <span className={`publish-state publish-state-${pill.tone}`} role="status" title={pill.text}>
+            <i aria-hidden />
+            {pill.text}
+          </span>
+        </nav>
         <label className="builder-search">
           <Search size={16} />
           <input aria-label="Search nodes" placeholder="Search component…" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
         </label>
         <div className="builder-actions">
-          <span className={`save-status save-status-${saveState}`}>
-            {saveState === "saved" ? <Database size={14} /> : <Cloud size={14} />}
-            {isDirty || contractDirty ? "Unsaved changes" : message}
-          </span>
           <button className="secondary-button compact-action" onClick={() => setShowContract(true)} type="button"><FileJson2 size={15} /> Contract</button>
           <button className="secondary-button compact-action" onClick={() => void handleValidate()} type="button"><CheckCircle2 size={15} /> Validate</button>
           <button className="secondary-button compact-action" onClick={() => void handlePublish()} type="button"><Send size={15} /> Publish version</button>

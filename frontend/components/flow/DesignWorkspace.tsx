@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type CSSProperties } from "react";
 import { ImagePlus, RotateCcw, Trash2 } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { defaultFlowAppearance, useFlowStore } from "@/stores/flow-store";
@@ -11,7 +11,7 @@ type ColorKey = "primary_color" | "background_color" | "surface_color" | "text_c
 const colorFields: Array<{ key: ColorKey; label: string }> = [
   { key: "primary_color", label: "Primary color" },
   { key: "background_color", label: "Background" },
-  { key: "surface_color", label: "Message surface" },
+  { key: "surface_color", label: "Bubble" },
   { key: "text_color", label: "Text color" },
 ];
 
@@ -20,6 +20,7 @@ const layoutChoices: Array<{ value: FlowAppearance["layout_style"]; label: strin
   { value: "personal", label: "Personal" },
   { value: "modern", label: "Modern" },
   { value: "minimal", label: "Minimal" },
+  { value: "spotlight", label: "Spotlight" },
 ];
 
 const presets = [
@@ -30,6 +31,10 @@ const presets = [
 
 function validHex(value: string) {
   return /^#[0-9A-F]{6}$/i.test(value);
+}
+
+function isPresetActive(appearance: FlowAppearance, preset: (typeof presets)[number]) {
+  return colorFields.every((field) => appearance[field.key].toUpperCase() === preset[field.key]);
 }
 
 function HexColorField({
@@ -54,15 +59,17 @@ function HexColorField({
   };
 
   return (
-    <label>
-      <span>{label}</span>
-      <span className={`design-color-input${validHex(draft) ? "" : " is-invalid"}`}>
+    <label className={`design-color-field${validHex(draft) ? "" : " is-invalid"}`}>
+      <span className="design-color-swatch" style={{ background: validHex(value) ? value : "#000000" }}>
         <input
           type="color"
           value={validHex(value) ? value : "#000000"}
           onChange={(event) => onChange({ [colorKey]: event.target.value.toUpperCase() })}
           aria-label={`${label} picker`}
         />
+      </span>
+      <span className="design-color-meta">
+        <span className="design-color-label">{label}</span>
         <input
           className="design-hex-input"
           aria-label={`${label} HEX value`}
@@ -105,6 +112,16 @@ export function DesignWorkspace() {
     reader.readAsDataURL(file);
   };
 
+  const isSpotlight = appearance.layout_style === "spotlight";
+  const previewVars = {
+    color: appearance.text_color,
+    background: appearance.surface_color,
+    "--chat-avatar": appearance.avatar_url ? `url("${appearance.avatar_url}")` : "none",
+  } as CSSProperties;
+  // Spotlight draws its own grey bubbles and neutral pills, so it skips the inline theme colours.
+  const messageStyle = isSpotlight ? { color: appearance.text_color } : { color: appearance.text_color, background: appearance.surface_color };
+  const optionStyle = isSpotlight ? undefined : { color: appearance.primary_color, borderColor: appearance.primary_color };
+
   const avatar = appearance.avatar_url ? (
     <img src={appearance.avatar_url} alt="Chat profile" />
   ) : (
@@ -123,19 +140,22 @@ export function DesignWorkspace() {
             className="icon-button"
             type="button"
             aria-label="Reset chat style"
+            title="Reset to defaults"
             onClick={() => updateAppearance(defaultFlowAppearance)}
           >
             <RotateCcw size={15} />
           </button>
         </div>
 
-        <fieldset className="design-layouts">
-          <legend>Layout</legend>
-          <div>
+        <section className="design-section">
+          <h3 className="design-section-title">Layout</h3>
+          <div className="design-layouts" role="radiogroup" aria-label="Layout">
             {layoutChoices.map((layout) => (
               <button
                 className={appearance.layout_style === layout.value ? "is-active" : ""}
                 type="button"
+                role="radio"
+                aria-checked={appearance.layout_style === layout.value}
                 key={layout.value}
                 onClick={() => updateAppearance({ layout_style: layout.value })}
               >
@@ -148,74 +168,84 @@ export function DesignWorkspace() {
               </button>
             ))}
           </div>
-        </fieldset>
+        </section>
 
-        <div className="design-content-fields">
-          <label>
-            Chat title
-            <input
-              value={appearance.title}
-              onChange={(event) => updateAppearance({ title: event.target.value })}
-              placeholder="Spaghetti chatbot"
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              rows={3}
-              value={appearance.description}
-              onChange={(event) => updateAppearance({ description: event.target.value })}
-              placeholder="Tell visitors how you can help."
-            />
-          </label>
-        </div>
-
-        <div className="design-avatar-field">
-          <div>
-            <span className="design-avatar-preview">{avatar}</span>
-            <span><strong>Profile picture</strong><small>PNG, JPG, WEBP or GIF · max 2 MB</small></span>
-          </div>
-          <div>
-            <label className="secondary-button" htmlFor="chat-avatar-upload">
-              <ImagePlus size={14} /> {appearance.avatar_url ? "Replace" : "Upload"}
+        <section className="design-section">
+          <h3 className="design-section-title">Content</h3>
+          <div className="design-content-fields">
+            <label>
+              Chat title
+              <input
+                value={appearance.title}
+                onChange={(event) => updateAppearance({ title: event.target.value })}
+                placeholder="Spaghetti chatbot"
+              />
             </label>
-            <input id="chat-avatar-upload" type="file" accept="image/*" onChange={uploadAvatar} />
-            {appearance.avatar_url ? (
-              <button className="mini-icon-button" type="button" aria-label="Remove profile picture" onClick={() => updateAppearance({ avatar_url: "" })}>
-                <Trash2 size={14} />
-              </button>
-            ) : null}
+            <label>
+              Description
+              <textarea
+                rows={3}
+                value={appearance.description}
+                onChange={(event) => updateAppearance({ description: event.target.value })}
+                placeholder="Tell visitors how you can help."
+              />
+            </label>
+            <div className="design-avatar-field">
+              <span className="design-avatar-preview">{avatar}</span>
+              <span className="design-avatar-copy">
+                <strong>Profile picture</strong>
+                <small>Image up to 2 MB</small>
+                {avatarError ? <small className="design-field-error">{avatarError}</small> : null}
+              </span>
+              <span className="design-avatar-actions">
+                <label className="secondary-button" htmlFor="chat-avatar-upload">
+                  <ImagePlus size={14} /> {appearance.avatar_url ? "Replace" : "Upload"}
+                </label>
+                <input id="chat-avatar-upload" type="file" accept="image/*" onChange={uploadAvatar} />
+                {appearance.avatar_url ? (
+                  <button className="mini-icon-button" type="button" aria-label="Remove profile picture" onClick={() => updateAppearance({ avatar_url: "" })}>
+                    <Trash2 size={14} />
+                  </button>
+                ) : null}
+              </span>
+            </div>
           </div>
-          {avatarError ? <small className="design-field-error">{avatarError}</small> : null}
-        </div>
+        </section>
 
-        <fieldset className="design-presets">
-          <legend>Quick themes</legend>
-          <div>
-            {presets.map((preset) => (
-              <button type="button" key={preset.label} onClick={() => updateAppearance(preset)}>
-                <span style={{ background: preset.primary_color }} />
-                {preset.label}
-              </button>
+        <section className="design-section">
+          <div className="design-section-head">
+            <h3 className="design-section-title">Colors</h3>
+            <div className="design-preset-chips" aria-label="Quick themes">
+              {presets.map((preset) => (
+                <button
+                  className={isPresetActive(appearance, preset) ? "is-active" : ""}
+                  type="button"
+                  key={preset.label}
+                  title={`Apply the ${preset.label} theme`}
+                  onClick={() => updateAppearance(preset)}
+                >
+                  <span style={{ background: preset.primary_color }} />
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="design-color-grid">
+            {colorFields.map((field) => (
+              <HexColorField
+                colorKey={field.key}
+                key={field.key}
+                label={field.label}
+                value={appearance[field.key]}
+                onChange={updateAppearance}
+              />
             ))}
           </div>
-        </fieldset>
-
-        <div className="design-color-fields">
-          {colorFields.map((field) => (
-            <HexColorField
-              colorKey={field.key}
-              key={field.key}
-              label={field.label}
-              value={appearance[field.key]}
-              onChange={updateAppearance}
-            />
-          ))}
-        </div>
+        </section>
       </aside>
 
-      <div className="design-preview-stage" style={{ background: "#FFFFFF" }}>
-        <div className={`design-chat-preview design-style-${appearance.layout_style}`} style={{ color: appearance.text_color, background: appearance.surface_color }}>
+      <div className="design-preview-stage" style={{ background: isSpotlight ? appearance.primary_color : "#FFFFFF" }}>
+        <div className={`design-chat-preview design-style-${appearance.layout_style}`} style={previewVars}>
           <header style={{ background: appearance.primary_color }}>
             <span className="design-preview-avatar">{avatar}</span>
             <div>
@@ -224,12 +254,12 @@ export function DesignWorkspace() {
             </div>
           </header>
           <div className="design-preview-conversation" style={{ background: appearance.background_color }}>
-            <div className="design-preview-message" style={{ color: appearance.text_color, background: appearance.surface_color }}>
+            <div className="design-preview-message" style={messageStyle}>
               Welcome! How can I help you today?
             </div>
             <div className="design-preview-options">
-              <button style={{ color: appearance.primary_color, borderColor: appearance.primary_color }} type="button">Option one</button>
-              <button style={{ color: appearance.primary_color, borderColor: appearance.primary_color }} type="button">Option two</button>
+              <button style={optionStyle} type="button">Option one</button>
+              <button style={optionStyle} type="button">Option two</button>
             </div>
           </div>
           <footer>

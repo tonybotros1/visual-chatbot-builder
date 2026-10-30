@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
-  ChevronLeft,
+  ChevronRight,
+  Home,
   CheckCircle2,
-  Cloud,
-  Database,
   Eye,
   Inbox,
   FlaskConical,
@@ -18,8 +17,8 @@ import {
   Languages,
   LayoutDashboard,
   ListTree,
+  MoreHorizontal,
   Palette,
-  RotateCcw,
   Save,
   Search,
   Send,
@@ -32,7 +31,7 @@ import { NodePalette } from "@/components/sidebar/NodePalette";
 import { loadFlow, saveFlow } from "@/services/flows";
 import { getBot, publishBot, validateBot } from "@/services/bots";
 import { useFlowStore } from "@/stores/flow-store";
-import type { ValidationIssue } from "@/types/api";
+import type { BotRecord, ValidationIssue } from "@/types/api";
 import type { BuilderNodeType, FlowDocument } from "@/types/flow";
 import { FlowCanvas } from "./FlowCanvas";
 import { DesignWorkspace } from "./DesignWorkspace";
@@ -40,6 +39,17 @@ import { ShareWorkspace } from "./ShareWorkspace";
 import { SettingsWorkspace } from "./SettingsWorkspace";
 
 type SaveState = "idle" | "loading" | "saving" | "saved" | "local" | "error";
+
+const QUIET_MESSAGES = new Set(["Loading draft…", "Draft loaded from PostgreSQL", "Saving draft…", "Saved to PostgreSQL", "Backend unavailable — saved in this browser", "Backend unavailable — browser draft loaded", "Backend unavailable — demo graph ready"]);
+
+const morePages = [
+  { segment: "responses", label: "Responses", description: "Collected answers and conversations", icon: Inbox },
+  { segment: "quality", label: "QA", description: "Test scenarios and analytics", icon: FlaskConical },
+  { segment: "deployments", label: "Deploy", description: "Widget, link, embed and targeting", icon: Rocket },
+  { segment: "integrations", label: "Integrate", description: "Providers, webhooks and delivery", icon: PlugZap },
+  { segment: "team", label: "Team", description: "Collaborators and audit log", icon: UsersRound },
+  { segment: "localization", label: "Locales", description: "Translations and RTL", icon: Languages },
+] as const;
 
 function localStorageKey(botId: string) {
   return `visual-chatbot-builder:${botId}:draft`;
@@ -145,16 +155,35 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const isDirty = useFlowStore((state) => state.isDirty);
   const appearance = useFlowStore((state) => state.appearance);
   const markSaved = useFlowStore((state) => state.markSaved);
-  const resetDemo = useFlowStore((state) => state.resetDemo);
   const searchQuery = useFlowStore((state) => state.searchQuery);
   const setGraph = useFlowStore((state) => state.setGraph);
   const selectNode = useFlowStore((state) => state.selectNode);
   const setSearchQuery = useFlowStore((state) => state.setSearchQuery);
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [message, setMessage] = useState("Loading draft…");
-  const [botName, setBotName] = useState("Bot builder");
+  const [bot, setBot] = useState<BotRecord | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [activeTab, setActiveTab] = useState<"questions" | "design" | "share" | "settings">("questions");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  // Close the More menu on outside click or Escape. Capture phase, because React Flow stops pointer events bubbling from the canvas.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) setMoreOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreOpen]);
 
   const loadDraft = useCallback(async () => {
     setSaveState("loading");
@@ -172,7 +201,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
     try {
       const [document, bot] = await Promise.all([loadFlow(botId), getBot(botId)]);
       setGraph(document);
-      setBotName(bot.name);
+      setBot(bot);
       setSaveState("saved");
       setMessage("Draft loaded from PostgreSQL");
     } catch (caught) {
@@ -194,6 +223,17 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   useEffect(() => {
     void loadDraft();
   }, [loadDraft]);
+
+  // Result messages (validation, publish, arrange) flash in the status pill for a few seconds.
+  useEffect(() => {
+    if (!message || QUIET_MESSAGES.has(message)) {
+      setFlash(null);
+      return;
+    }
+    setFlash(message);
+    const timer = window.setTimeout(() => setFlash(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
 
   const handleSave = async (): Promise<boolean> => {
     const document = getDocument();
@@ -263,6 +303,16 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
     }
   };
 
+  // The pill answers one question: are the latest changes saved?
+  const publishState: { text: string; tone: "warn" | "ok" | "neutral" | "error" | "info" } =
+    saveState === "loading" ? { text: "Loading…", tone: "neutral" }
+    : saveState === "saving" ? { text: "Saving…", tone: "info" }
+    : saveState === "error" ? { text: message, tone: "error" }
+    : saveState === "local" ? { text: "Saved in this browser only", tone: "warn" }
+    : flash ? { text: flash, tone: "info" }
+    : isDirty ? { text: "Unsaved changes", tone: "warn" }
+    : { text: "Saved", tone: "ok" };
+
   return (
     <main
       className={`builder-page${activeTab === "design" ? " is-design-mode" : activeTab === "share" ? " is-share-mode" : activeTab === "settings" ? " is-settings-mode" : ""}`}
@@ -274,18 +324,22 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
       } as CSSProperties}
     >
       <header className="builder-topbar">
-        <div className="builder-brand">
-          <Link href="/dashboard" className="icon-button" aria-label="Back to dashboard">
-            <ChevronLeft size={19} />
+        <nav className="builder-crumbs" aria-label="Breadcrumb">
+          <Link href="/dashboard" className="crumb-home" aria-label="Dashboard" title="Dashboard">
+            <Home size={16} />
           </Link>
-          <span className="brand-mark brand-mark-small">
-            <SpaghettiMark size={31} />
-          </span>
-          <div>
-            <strong>{botName}</strong>
-            <span>Spaghetti · Draft flow</span>
+          <ChevronRight className="crumb-sep" size={14} aria-hidden />
+          <span className="crumb-bot" title={bot?.name ?? ""}>{bot?.name ?? "Loading…"}</span>
+          <ChevronRight className="crumb-sep" size={14} aria-hidden />
+          <div className="crumb-switch" role="group" aria-label="Bot section">
+            <button className="is-active" type="button" aria-current="page">Edit</button>
+            <Link href={`/bots/${botId}/responses`}>Results</Link>
           </div>
-        </div>
+          <span className={`publish-state publish-state-${publishState.tone}`} role="status" title={publishState.text}>
+            <i aria-hidden />
+            {publishState.text}
+          </span>
+        </nav>
 
         {activeTab === "questions" ? (
           <label className="builder-search">
@@ -302,20 +356,6 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
         <div className="builder-actions">
           {activeTab === "questions" ? (
             <>
-              <span className={`save-status save-status-${saveState}`}>
-                {saveState === "saved" ? <Database size={14} /> : <Cloud size={14} />}
-                {isDirty ? "Unsaved changes" : message}
-              </span>
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  resetDemo();
-                  setMessage("Demo graph restored — save to keep it");
-                }}
-                type="button"
-              >
-                <RotateCcw size={16} /> Reset
-              </button>
               <button
                 className="secondary-button compact-action"
                 onClick={() => {
@@ -337,31 +377,37 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
           </button>
           {activeTab === "questions" ? (
             <>
-              <Link className="secondary-button compact-action" href={`/bots/${botId}/responses`}>
-                <Inbox size={15} /> Responses
-              </Link>
-              <Link className="secondary-button compact-action" href={`/bots/${botId}/quality`}>
-                <FlaskConical size={15} /> QA
-              </Link>
-              <Link className="secondary-button compact-action" href={`/bots/${botId}/deployments`}>
-                <Rocket size={15} /> Deploy
-              </Link>
-              <Link className="secondary-button compact-action" href={`/bots/${botId}/integrations`}>
-                <PlugZap size={15} /> Integrate
-              </Link>
-              <Link className="secondary-button compact-action" href={`/bots/${botId}/team`}>
-                <UsersRound size={15} /> Team
-              </Link>
-              <Link className="secondary-button compact-action" href={`/bots/${botId}/localization`}>
-                <Languages size={15} /> Locales
-              </Link>
+              <div className="builder-more" ref={moreRef}>
+                <button
+                  className={`secondary-button compact-action${moreOpen ? " is-open" : ""}`}
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                  onClick={() => setMoreOpen((open) => !open)}
+                >
+                  <MoreHorizontal size={15} /> More
+                </button>
+                {moreOpen ? (
+                  <div className="builder-more-menu" role="menu" aria-label="More bot pages">
+                    {morePages.map((page) => (
+                      <Link key={page.segment} role="menuitem" href={`/bots/${botId}/${page.segment}`} onClick={() => setMoreOpen(false)}>
+                        <page.icon size={16} />
+                        <span>
+                          <strong>{page.label}</strong>
+                          <small>{page.description}</small>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <button className="secondary-button compact-action" onClick={() => void handlePublish()} type="button">
                 <Send size={15} /> Publish
               </button>
             </>
           ) : null}
           <button className="primary-button save-draft-button" onClick={() => void handleSave()} disabled={saveState === "saving"} type="button">
-            <Save size={16} /> {saveState === "saving" ? "Saving…" : "Save draft"}
+            <Save size={15} /> {saveState === "saving" ? "Saving…" : "Save draft"}
           </button>
         </div>
       </header>

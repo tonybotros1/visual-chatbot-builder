@@ -113,7 +113,7 @@ export type FlowAppearance = {
   surface_color: string;
   text_color: string;
   avatar_url: string;
-  layout_style: "card" | "personal" | "modern" | "minimal";
+  layout_style: "card" | "personal" | "modern" | "minimal" | "spotlight";
 };
 
 export type FlowSettings = {

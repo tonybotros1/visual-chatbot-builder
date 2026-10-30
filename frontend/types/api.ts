@@ -89,7 +89,7 @@ export type ConversationState = {
     surface_color?: string;
     text_color?: string;
     avatar_url?: string;
-    layout_style?: "card" | "personal" | "modern" | "minimal";
+    layout_style?: "card" | "personal" | "modern" | "minimal" | "spotlight";
   };
   settings: Partial<FlowSettings>;
   progress_percent: number;

@@ -1,8 +1,9 @@
 "use client";
 
+import { useMemo, useRef } from "react";
 import { BaseEdge, Position, type EdgeProps } from "@xyflow/react";
 import { useFlowStore } from "@/stores/flow-store";
-import type { BuilderEdge } from "@/types/flow";
+import type { BuilderEdge, BuilderNode } from "@/types/flow";
 
 type Point = { x: number; y: number };
 type Rect = { left: number; right: number; top: number; bottom: number };
@@ -10,6 +11,7 @@ type Rect = { left: number; right: number; top: number; bottom: number };
 const NODE_CLEARANCE = 24;
 const HANDLE_LEAD = 32;
 const CORNER_RADIUS = 11;
+const MAX_DETOUR_OBSTACLES = 24;
 
 function samePoint(left: Point, right: Point) {
   return Math.abs(left.x - right.x) < 0.5 && Math.abs(left.y - right.y) < 0.5;
@@ -121,7 +123,20 @@ function buildRoute(
 ) {
   const sourceLead = leadPoint(source, sourcePosition, HANDLE_LEAD);
   const targetLead = leadPoint(target, targetPosition, HANDLE_LEAD);
-  const obstacleRoutes = obstacles.flatMap((obstacle) => [obstacle.top - 12, obstacle.bottom + 12]);
+  // Every candidate segment lies between the leftmost and rightmost of these x values,
+  // so nodes outside that horizontal band can never be hit and are ignored up front.
+  const minX = Math.min(source.x, sourceLead.x, target.x, targetLead.x);
+  const maxX = Math.max(source.x, sourceLead.x, target.x, targetLead.x);
+  const relevant = obstacles.filter((obstacle) => obstacle.right > minX && obstacle.left < maxX);
+  const midY = (sourceLead.y + targetLead.y) / 2;
+  // Dense columns can still leave dozens of obstacles in the band; the detour rows that
+  // matter are the ones nearest the edge, so cap how many we try.
+  const detourObstacles = relevant.length > MAX_DETOUR_OBSTACLES
+    ? [...relevant]
+        .sort((left, right) => Math.abs((left.top + left.bottom) / 2 - midY) - Math.abs((right.top + right.bottom) / 2 - midY))
+        .slice(0, MAX_DETOUR_OBSTACLES)
+    : relevant;
+  const obstacleRoutes = detourObstacles.flatMap((obstacle) => [obstacle.top - 12, obstacle.bottom + 12]);
   const routeYs = [
     sourceLead.y,
     targetLead.y,
@@ -140,7 +155,7 @@ function buildRoute(
     target,
   ]);
 
-  const clearRoutes = candidates.filter((candidate) => routeIsClear(candidate, obstacles));
+  const clearRoutes = candidates.filter((candidate) => routeIsClear(candidate, relevant));
   const availableRoutes = clearRoutes.length ? clearRoutes : candidates;
   return availableRoutes.sort((left, right) => {
     const leftScore = routeLength(left) + simplifyPoints(left).length * 10;
@@ -170,26 +185,35 @@ export function ObstacleAwareEdge({
   interactionWidth,
 }: EdgeProps<BuilderEdge>) {
   const nodes = useFlowStore((state) => state.nodes);
-  const obstacles = nodes
-    .filter((node) => node.id !== source && node.id !== target && !node.hidden)
-    .map((node) => {
-      const width = node.measured?.width ?? node.width ?? 220;
-      const height = node.measured?.height ?? node.height ?? 120;
-      return {
-        left: node.position.x - NODE_CLEARANCE,
-        right: node.position.x + width + NODE_CLEARANCE,
-        top: node.position.y - NODE_CLEARANCE,
-        bottom: node.position.y + height + NODE_CLEARANCE,
-      };
-    });
+  // While a node is being dragged the store emits a new node list on every pointer move.
+  // Keep routing against the last settled layout so only the edges whose endpoints move
+  // recompute; everything re-routes once when the drag ends.
+  const isDragging = nodes.some((node) => node.dragging);
+  const settledNodes = useRef<BuilderNode[]>(nodes);
+  if (!isDragging) settledNodes.current = nodes;
+  const obstacleNodes = settledNodes.current;
 
-  const points = buildRoute(
-    { x: sourceX, y: sourceY },
-    { x: targetX, y: targetY },
-    sourcePosition,
-    targetPosition,
-    obstacles,
-  );
+  const points = useMemo(() => {
+    const obstacles = obstacleNodes
+      .filter((node) => node.id !== source && node.id !== target && !node.hidden)
+      .map((node) => {
+        const width = node.measured?.width ?? node.width ?? 220;
+        const height = node.measured?.height ?? node.height ?? 120;
+        return {
+          left: node.position.x - NODE_CLEARANCE,
+          right: node.position.x + width + NODE_CLEARANCE,
+          top: node.position.y - NODE_CLEARANCE,
+          bottom: node.position.y + height + NODE_CLEARANCE,
+        };
+      });
+    return buildRoute(
+      { x: sourceX, y: sourceY },
+      { x: targetX, y: targetY },
+      sourcePosition,
+      targetPosition,
+      obstacles,
+    );
+  }, [obstacleNodes, source, sourcePosition, sourceX, sourceY, target, targetPosition, targetX, targetY]);
   const labelPoint = routeMidpoint(points);
 
   return (

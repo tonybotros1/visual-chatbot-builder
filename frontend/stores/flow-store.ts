@@ -486,7 +486,6 @@ type FlowState = {
   setGraph: (document: FlowDocument) => void;
   getDocument: () => FlowDocument;
   markSaved: () => void;
-  resetDemo: () => void;
 };
 
 function cloneNodeData(data: BuilderNodeData): BuilderNodeData {
@@ -646,17 +645,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const loadedAppearance = { ...defaultFlowAppearance, ...(document.appearance ?? {}) };
     const hasLegacyDefaultDescription = loadedAppearance.description === "We are online and ready to help.";
     if (hasLegacyDefaultDescription) loadedAppearance.description = "";
-    const assignedNodeNumbers = document.nodes.some(
-      (node, index) => node.data.node_number !== nodes[index]?.data.node_number,
-    );
     set({
       nodes,
       edges: sanitized.map((edge) => ({ ...edge, ...edgeDefaults })),
       appearance: loadedAppearance,
       settings: { ...defaultFlowSettings, ...(document.settings ?? {}) },
       selectedNodeId: null,
-      layoutRevision: get().layoutRevision,
-      isDirty: assignedNodeNumbers || sanitized.length !== document.edges.length || hasLegacyDefaultDescription,
+      // Bumping the revision makes the canvas fit the loaded flow; the mount-time fitView ran on an empty graph.
+      layoutRevision: get().layoutRevision + 1,
+      // Node numbers are re-derived on every save, so assigning them on load is not an unsaved change.
+      isDirty: sanitized.length !== document.edges.length || hasLegacyDefaultDescription,
     });
   },
 
@@ -673,15 +671,4 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   markSaved: () => set({ isDirty: false }),
 
-  resetDemo: () =>
-    set({
-      nodes: cloneInitialNodes(),
-      edges: cloneInitialEdges(),
-      appearance: { ...defaultFlowAppearance },
-      settings: { ...defaultFlowSettings },
-      selectedNodeId: null,
-      searchQuery: "",
-      layoutRevision: get().layoutRevision + 1,
-      isDirty: true,
-    }),
 }));

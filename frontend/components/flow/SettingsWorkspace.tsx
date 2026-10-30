@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getBot, updateBot } from "@/services/bots";
 import {
   BellRing,
   Check,
@@ -73,6 +74,9 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
 export function SettingsWorkspace({ botId }: { botId: string }) {
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const [copied, setCopied] = useState(false);
+  const [slug, setSlug] = useState("");
+  const [savedSlug, setSavedSlug] = useState("");
+  const [slugError, setSlugError] = useState("");
   const [recipientDraft, setRecipientDraft] = useState("");
   const [showNotificationFilters, setShowNotificationFilters] = useState(false);
   const appearance = useFlowStore((state) => state.appearance);
@@ -93,6 +97,32 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
   const setDelay = (value: number) => {
     const normalized = Math.min(10, Math.max(0, Number.isFinite(value) ? value : 0));
     updateSettings({ response_delay_seconds: normalized });
+  };
+
+  useEffect(() => {
+    getBot(botId)
+      .then((bot) => {
+        setSlug(bot.slug);
+        setSavedSlug(bot.slug);
+      })
+      .catch(() => undefined);
+  }, [botId]);
+
+  const saveSlug = async () => {
+    const next = slug.trim().toLowerCase();
+    if (!next || next === savedSlug) {
+      setSlug(savedSlug);
+      setSlugError("");
+      return;
+    }
+    try {
+      const bot = await updateBot(botId, { slug: next });
+      setSlug(bot.slug);
+      setSavedSlug(bot.slug);
+      setSlugError("");
+    } catch (caught) {
+      setSlugError(caught instanceof Error ? caught.message : "Could not update the link");
+    }
   };
 
   const copyBotId = async () => {
@@ -208,6 +238,25 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
                   Chatbot title
                   <input value={appearance.title} onChange={(event) => updateAppearance({ title: event.target.value })} placeholder="Spaghetti chatbot" />
                   <small>Shown at the top of the chat window.</small>
+                </label>
+                <label>
+                  Public link
+                  <span className="settings-slug-field">
+                    <span>/chat/</span>
+                    <input
+                      value={slug}
+                      spellCheck={false}
+                      onChange={(event) => setSlug(event.target.value)}
+                      onBlur={() => void saveSlug()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
+                      }}
+                    />
+                  </span>
+                  <small>{slugError ? <span className="design-field-error">{slugError}</span> : "Letters, numbers and dashes. Changing it breaks links you have already shared."}</small>
                 </label>
                 <label>
                   Time zone
