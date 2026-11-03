@@ -333,88 +333,6 @@ export function DesignWorkspace() {
           </button>
         </div>
 
-        <div className="design-card">
-          <div className="design-avatar-row">
-            <div>
-              <strong>Avatar</strong>
-              <small>Shown beside replies and on the widget launcher</small>
-            </div>
-            <span className="design-avatar-preview design-avatar-large">{replyMode === "hidden" ? <SpaghettiMark size={22} title="" /> : replyAvatar}</span>
-          </div>
-          <div className="design-segment" role="group" aria-label="Avatar">
-            {replyChoices.map((choice) => (
-              <button
-                key={choice.value}
-                type="button"
-                className={replyMode === choice.value ? "is-active" : ""}
-                aria-pressed={replyMode === choice.value}
-                onClick={() => updateAppearance({ reply_avatar: choice.value })}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-          {replyMode === "custom" ? (
-            <div className="design-avatar-field">
-              <span className="design-avatar-preview">{appearance.reply_avatar_url ? <img src={appearance.reply_avatar_url} alt="Reply avatar" /> : <SpaghettiMark size={34} />}</span>
-              <span className="design-avatar-copy">
-                <strong>Avatar image</strong>
-                <small>{appearance.reply_avatar_url ? "Any image up to 25 MB; resized to fit" : "Uses the profile picture until you upload one"}</small>
-                {replyAvatarError ? <small className="design-field-error">{replyAvatarError}</small> : null}
-              </span>
-              <span className="design-avatar-actions">
-                <label className="secondary-button" htmlFor="chat-reply-avatar-upload">
-                  <ImagePlus size={14} /> {appearance.reply_avatar_url ? "Replace" : "Upload"}
-                </label>
-                <input id="chat-reply-avatar-upload" type="file" accept="image/*" onChange={uploadReplyAvatar} />
-                {appearance.reply_avatar_url ? (
-                  <button className="mini-icon-button" type="button" aria-label="Remove avatar image" onClick={() => updateAppearance({ reply_avatar_url: "" })}>
-                    <Trash2 size={14} />
-                  </button>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
-          {replyMode === "custom" ? (
-            <AvatarPresets current={appearance.reply_avatar_url} onPick={(dataUrl) => { updateAppearance({ reply_avatar_url: dataUrl }); setReplyAvatarError(""); }} />
-          ) : null}
-
-          <div className="design-theme-row">
-            <strong>Theme color</strong>
-            <HexColorField colorKey="primary_color" label="Primary" value={appearance.primary_color} onChange={onPrimaryChange} />
-          </div>
-          <details className="design-more-colors">
-            <summary>More colours</summary>
-            <div className="design-more-colors-body">
-              <div className="design-preset-chips" aria-label="Quick themes">
-                {presets.map((preset) => (
-                  <button
-                    className={isPresetActive(appearance, preset) ? "is-active" : ""}
-                    type="button"
-                    key={preset.label}
-                    title={`Apply the ${preset.label} theme`}
-                    onClick={() => updateAppearance(preset)}
-                  >
-                    <span style={{ background: preset.primary_color }} />
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-              <div className="design-color-grid">
-                {colorFields.filter((field) => field.key !== "primary_color").map((field) => (
-                  <HexColorField
-                    colorKey={field.key}
-                    key={field.key}
-                    label={field.label}
-                    value={appearance[field.key]}
-                    onChange={updateAppearance}
-                  />
-                ))}
-              </div>
-            </div>
-          </details>
-        </div>
-
         <div className="design-card design-card-tabbed">
           <div className="design-card-tabs" role="tablist" aria-label="Design area">
             <button type="button" role="tab" aria-selected={panel === "widget"} className={panel === "widget" ? "is-active" : ""} onClick={() => choosePanel("widget")}>Widget</button>
@@ -530,6 +448,88 @@ export function DesignWorkspace() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="design-card">
+          <div className="design-avatar-row">
+            <div>
+              <strong>Avatar</strong>
+              <small>Shown beside replies and on the widget launcher</small>
+            </div>
+            <span className="design-avatar-preview design-avatar-large">{replyMode === "hidden" ? <SpaghettiMark size={22} title="" /> : replyAvatar}</span>
+          </div>
+          <div className="design-segment" role="group" aria-label="Avatar">
+            {replyChoices.map((choice) => (
+              <button
+                key={choice.value}
+                type="button"
+                className={replyMode === choice.value ? "is-active" : ""}
+                aria-pressed={replyMode === choice.value}
+                onClick={() => updateAppearance({ reply_avatar: choice.value })}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+          {replyMode === "custom" ? (
+            <div className="design-avatar-field">
+              <span className="design-avatar-preview">{appearance.reply_avatar_url ? <img src={appearance.reply_avatar_url} alt="Reply avatar" /> : <SpaghettiMark size={34} />}</span>
+              <span className="design-avatar-copy">
+                <strong>Avatar image</strong>
+                <small>{appearance.reply_avatar_url ? "Any image up to 25 MB; resized to fit" : "Uses the profile picture until you upload one"}</small>
+                {replyAvatarError ? <small className="design-field-error">{replyAvatarError}</small> : null}
+              </span>
+              <span className="design-avatar-actions">
+                <label className="secondary-button" htmlFor="chat-reply-avatar-upload">
+                  <ImagePlus size={14} /> {appearance.reply_avatar_url ? "Replace" : "Upload"}
+                </label>
+                <input id="chat-reply-avatar-upload" type="file" accept="image/*" onChange={uploadReplyAvatar} />
+                {appearance.reply_avatar_url ? (
+                  <button className="mini-icon-button" type="button" aria-label="Remove avatar image" onClick={() => updateAppearance({ reply_avatar_url: "" })}>
+                    <Trash2 size={14} />
+                  </button>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+          {replyMode === "custom" ? (
+            <AvatarPresets current={appearance.reply_avatar_url} onPick={(dataUrl) => { updateAppearance({ reply_avatar_url: dataUrl }); setReplyAvatarError(""); }} />
+          ) : null}
+
+          <div className="design-theme-row">
+            <strong>Theme color</strong>
+            <HexColorField colorKey="primary_color" label="Primary" value={appearance.primary_color} onChange={onPrimaryChange} />
+          </div>
+          <details className="design-more-colors">
+            <summary>More colours</summary>
+            <div className="design-more-colors-body">
+              <div className="design-preset-chips" aria-label="Quick themes">
+                {presets.map((preset) => (
+                  <button
+                    className={isPresetActive(appearance, preset) ? "is-active" : ""}
+                    type="button"
+                    key={preset.label}
+                    title={`Apply the ${preset.label} theme`}
+                    onClick={() => updateAppearance(preset)}
+                  >
+                    <span style={{ background: preset.primary_color }} />
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="design-color-grid">
+                {colorFields.filter((field) => field.key !== "primary_color").map((field) => (
+                  <HexColorField
+                    colorKey={field.key}
+                    key={field.key}
+                    label={field.label}
+                    value={appearance[field.key]}
+                    onChange={updateAppearance}
+                  />
+                ))}
+              </div>
+            </div>
+          </details>
         </div>
       </aside>
 
