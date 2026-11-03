@@ -10662,31 +10662,6 @@ select:not([multiple]):not([size])::-ms-expand {
   gap: 8px;
 }
 
-.design-swatches {
-  display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.design-swatches button {
-  width: 100%;
-  aspect-ratio: 1;
-  padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: transform 120ms ease;
-}
-
-.design-swatches button:hover {
-  transform: scale(1.1);
-}
-
-.design-swatches button.is-active {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
 .design-more-colors summary {
   color: var(--muted);
   font-size: 12px;

@@ -29,9 +29,6 @@ const positionChoices: Array<{ value: FlowAppearance["widget_position"]; label: 
   { value: "right", label: "Right" },
 ];
 
-/** Quick theme swatches; picking one also derives a darker accent. */
-const themeSwatches = ["#E11D48", "#FBF59B", "#00A1B0", "#2563EB", "#0891B2", "#16A34A", "#CA8A04", "#EA580C", "#475569", "#0F172A", "#FFFFFF"];
-
 type DesignPanel = "widget" | "page";
 type PreviewMode = "widget" | "page" | "embed";
 
@@ -281,7 +278,6 @@ export function DesignWorkspace() {
     setPanel(next);
     setPreviewMode(next);
   };
-  const pickTheme = (hex: string) => updateAppearance({ primary_color: hex, accent_color: darkenHex(hex, 0.3) });
   const onPrimaryChange = (updates: Partial<FlowAppearance>) =>
     updateAppearance(updates.primary_color ? { ...updates, accent_color: darkenHex(updates.primary_color, 0.3) } : updates);
 
@@ -386,20 +382,6 @@ export function DesignWorkspace() {
           <div className="design-theme-row">
             <strong>Theme color</strong>
             <HexColorField colorKey="primary_color" label="Primary" value={appearance.primary_color} onChange={onPrimaryChange} />
-          </div>
-          <div className="design-swatches" role="group" aria-label="Theme colours">
-            {themeSwatches.map((hex) => (
-              <button
-                key={hex}
-                type="button"
-                className={appearance.primary_color.toUpperCase() === hex ? "is-active" : ""}
-                style={{ background: hex }}
-                title={hex}
-                aria-label={`Use ${hex}`}
-                aria-pressed={appearance.primary_color.toUpperCase() === hex}
-                onClick={() => pickTheme(hex)}
-              />
-            ))}
           </div>
           <details className="design-more-colors">
             <summary>More colours</summary>
