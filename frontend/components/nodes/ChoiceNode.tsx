@@ -21,17 +21,25 @@ export const ChoiceNode = memo(function ChoiceNode({ id, data, selected, type }:
       <RichText className="node-rich-label" content={data.label} />
       <div className="choice-options">
         {options.map((option, index) => (
-          <div className="choice-option" key={`${option}-${index}`}>
+          <div className={data.single_next ? "choice-option choice-option-plain" : "choice-option"} key={`${option}-${index}`}>
             <span>{option}</span>
-            <Handle
-              id={`option-${index}`}
-              className="choice-handle"
-              type="source"
-              position={Position.Right}
-            />
+            {data.single_next ? null : (
+              <Handle
+                id={`option-${index}`}
+                className="choice-handle"
+                type="source"
+                position={Position.Right}
+              />
+            )}
           </div>
         ))}
-        {data.required === false ? (
+        {data.single_next ? (
+          <div className="choice-option choice-option-next">
+            <span>Next</span>
+            <Handle id="next" className="choice-handle" type="source" position={Position.Right} />
+          </div>
+        ) : null}
+        {data.required === false && !data.single_next ? (
           <div className="choice-option choice-option-skip">
             <span>Skip</span>
             <Handle

@@ -13,6 +13,7 @@ from app.api.routes.workspaces import visible_workspace
 from app.database.seed import DEFAULT_FLOW
 from app.database.session import get_db
 from app.models.bot import Bot, BotVersion
+from app.models.localization import BotLocale
 from app.models.user import User
 from app.models.team import BotCollaborator
 from app.models.workspace import Workspace
@@ -164,6 +165,41 @@ def create_bot(
     db.commit()
     db.refresh(bot)
     return bot_read(bot, user, db, role="owner", owner=user)
+
+
+@router.post("/{bot_id}/duplicate", response_model=BotRead, status_code=status.HTTP_201_CREATED)
+def duplicate_bot(
+    bot_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> BotRead:
+    """A fresh draft bot owned by the caller with the source bot's current draft flow and languages."""
+    source = owned_bot(bot_id, user, db)
+    draft = db.scalar(
+        select(BotVersion)
+        .where(BotVersion.bot_id == source.id, BotVersion.published.is_(False))
+        .order_by(BotVersion.version_number.desc())
+    ) or db.scalar(select(BotVersion).where(BotVersion.bot_id == source.id).order_by(BotVersion.version_number.desc()))
+    base_name = re.sub(r"\s+\(copy(?: \d+)?\)$", "", source.name).strip() or source.name
+    name = f"{base_name} (copy)"
+    if len(name) > 160:
+        name = name[:153].rstrip() + " (copy)"
+    copy = Bot(
+        user_id=user.id,
+        workspace_id=workspace_for(source.workspace_id, user, db) if source.workspace_id else None,
+        name=name,
+        slug=unique_slug(name, db),
+        description=source.description,
+        status="draft",
+    )
+    db.add(copy)
+    db.flush()
+    db.add(BotVersion(bot_id=copy.id, version_number=0, flow_json=dict(draft.flow_json) if draft else DEFAULT_FLOW, published=False))
+    for locale in db.scalars(select(BotLocale).where(BotLocale.bot_id == source.id)):
+        db.add(BotLocale(bot_id=copy.id, locale=locale.locale, name=locale.name, direction=locale.direction, translations=dict(locale.translations or {}), is_default=locale.is_default))
+    db.commit()
+    db.refresh(copy)
+    return bot_read(copy, user, db, role="owner", owner=user)
 
 
 @router.get("/{bot_id}", response_model=BotRead)

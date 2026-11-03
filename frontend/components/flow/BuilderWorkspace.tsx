@@ -16,6 +16,8 @@ import {
   UsersRound,
   Languages,
   LayoutDashboard,
+  Redo2,
+  Undo2,
   LayoutList,
   List,
   Network,
@@ -161,6 +163,10 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const layoutMode = useFlowStore((state) => state.layoutMode);
   const setLayoutMode = useFlowStore((state) => state.setLayoutMode);
   const resetTreeNudges = useFlowStore((state) => state.resetTreeNudges);
+  const undo = useFlowStore((state) => state.undo);
+  const redo = useFlowStore((state) => state.redo);
+  const canUndo = useFlowStore((state) => state.history.length > 0);
+  const canRedo = useFlowStore((state) => state.future.length > 0);
   const isDirty = useFlowStore((state) => state.isDirty);
   const appearance = useFlowStore((state) => state.appearance);
   const markSaved = useFlowStore((state) => state.markSaved);
@@ -188,6 +194,28 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   }, []);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+
+  // Ctrl/Cmd+Z undoes the last builder change and Ctrl+Y / Ctrl+Shift+Z redoes it, except while typing in a
+  // field, where the browser's own text undo keeps working.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        if (!useFlowStore.getState().history.length) return;
+        event.preventDefault();
+        undo();
+      } else if (key === "y" || (key === "z" && event.shiftKey)) {
+        if (!useFlowStore.getState().future.length) return;
+        event.preventDefault();
+        redo();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo]);
 
   // Close the More menu on outside click or Escape. Capture phase, because React Flow stops pointer events bubbling from the canvas.
   useEffect(() => {
@@ -393,6 +421,10 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
               >
                 {viewMode === "compact" ? <List size={15} /> : <LayoutList size={15} />} {viewMode === "compact" ? "Compact" : "Detailed"}
               </button>
+              <div className="toolbar-history" role="group" aria-label="Undo and redo">
+                <button className="secondary-button compact-action" type="button" disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" onClick={undo}><Undo2 size={15} /></button>
+                <button className="secondary-button compact-action" type="button" disabled={!canRedo} title="Redo (Ctrl+Y)" aria-label="Redo" onClick={redo}><Redo2 size={15} /></button>
+              </div>
               <button
                 className="secondary-button compact-action"
                 onClick={() => {

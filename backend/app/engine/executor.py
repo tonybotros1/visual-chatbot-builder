@@ -256,7 +256,11 @@ def validate_answer(node: dict[str, Any], value: Any) -> Any:
 def answer_target(flow: dict[str, Any], node: dict[str, Any], value: Any) -> str | None:
     node_type = node.get("type")
     handle = None
-    if node_type in {"singleChoice", "choice"}:
+    data = node.get("data", {})
+    if node_type in {"singleChoice", "choice", "multipleChoice"} and data.get("single_next"):
+        # "Same next step for every choice": the selection is recorded but does not branch.
+        handle = "next"
+    elif node_type in {"singleChoice", "choice"}:
         data = node.get("data", {})
         values = choice_values(data)
         if value in (None, "", []):

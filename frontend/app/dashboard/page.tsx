@@ -8,6 +8,7 @@ import {
   Archive,
   Blocks,
   Check,
+  Copy,
   FolderInput,
   FolderOpen,
   FolderPlus,
@@ -25,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
-import { archiveBot, createBot, listBots, updateBot } from "@/services/bots";
+import { archiveBot, createBot, duplicateBot, listBots, updateBot } from "@/services/bots";
 import { createWorkspace, deleteWorkspace, listWorkspaces, updateWorkspace } from "@/services/workspaces";
 import { confirmDialog, promptDialog } from "@/stores/dialog-store";
 import { currentUser, logout } from "@/services/auth";
@@ -180,6 +181,17 @@ export default function DashboardPage() {
       setBots((items) => items.map((item) => (item.id === updated.id ? updated : item)));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not rename bot");
+    }
+  };
+
+  const duplicate = async (bot: BotRecord) => {
+    setError("");
+    try {
+      const created = await duplicateBot(bot.id);
+      setBots((items) => [created, ...items]);
+      if (selected !== ALL && selected !== created.workspace_id && !(selected === UNSORTED && created.workspace_id === null)) choose(created.workspace_id ?? UNSORTED);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not duplicate bot");
     }
   };
 
@@ -428,6 +440,7 @@ export default function DashboardPage() {
                     </Link>
                     <div className="bot-tile-actions">
                       {canManage ? <button type="button" onClick={() => void rename(bot)}><Pencil size={14} /> Rename</button> : null}
+                      <button type="button" title="Make a copy of this bot" onClick={() => void duplicate(bot)}><Copy size={14} /> Duplicate</button>
                       {canManage ? (
                       <div className="bot-move">
                         <button

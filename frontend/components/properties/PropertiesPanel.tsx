@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Bold, ImagePlus, Italic, Link2, List, ListOrdered, Plus, Strikethrough, Trash2, Underline, X } from "lucide-react";
+import { Bold, Braces, Copy, GripVertical, ImagePlus, Italic, Link2, List, ListOrdered, Plus, Strikethrough, Trash2, Underline, X } from "lucide-react";
+import { LinkIcon } from "@/components/chatbot/LinkIcon";
 import { listSubflows, listSubflowVersions } from "@/services/subflows";
 import { listLogicAssets, listLogicVersions } from "@/services/logic";
 import { listIntegrations } from "@/services/integrations";
@@ -9,6 +10,7 @@ import { useFlowStore } from "@/stores/flow-store";
 import { richTextToPlainText, richTextToSafeHtml } from "@/components/content/RichText";
 import { Select as SpaghettiSelect } from "@/components/ui/Select";
 import type { IntegrationConnection, LogicAssetRecord, LogicVersion, SubflowRecord, SubflowVersion } from "@/types/api";
+import type { LinkAction } from "@/types/flow";
 
 const inputTypes = new Set([
   "textInput",
@@ -119,7 +121,12 @@ export function PropertiesPanel() {
   const edges = useFlowStore((state) => state.edges);
   const selectedNodeId = useFlowStore((state) => state.selectedNodeId);
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
+  const duplicateNode = useFlowStore((state) => state.duplicateNode);
+  const onEdgesChange = useFlowStore((state) => state.onEdgesChange);
   const onNodesChange = useFlowStore((state) => state.onNodesChange);
+  // Links node: which link is being dragged and which card it is hovering over.
+  const [dragLinkIndex, setDragLinkIndex] = useState<number | null>(null);
+  const [dropLinkIndex, setDropLinkIndex] = useState<number | null>(null);
   const setJumpTarget = useFlowStore((state) => state.setJumpTarget);
   const selectNode = useFlowStore((state) => state.selectNode);
   const node = nodes.find((item) => item.id === selectedNodeId);
@@ -281,8 +288,37 @@ export function PropertiesPanel() {
 
   const options = node.data.options ?? [];
   const isBranchingJump = ["choice", "singleChoice", "multipleChoice", "condition"].includes(node.type);
+  // Answers collected so far (nodes before this one) that the label can show back with {{variable}}.
+  const variableChoices = nodes
+    .filter((item) => item.id !== node.id && typeof item.data.variable === "string" && item.data.variable.trim())
+    .sort((left, right) => (left.data.node_number ?? 0) - (right.data.node_number ?? 0))
+    .map((item) => ({ value: item.data.variable as string, label: `{{${item.data.variable}}} · #${item.data.node_number ?? "?"} ${richTextToPlainText(item.data.label).slice(0, 40)}` }));
+  const insertVariable = (variable: string) => {
+    if (!variable) return;
+    applyLabelCommand("insertText", `{{${variable}}}`);
+  };
+  const setSingleNext = (enabled: boolean) => {
+    // Edges hanging off handles that no longer exist would otherwise linger invisibly.
+    const stale = edges.filter((edge) => edge.source === node.id && (enabled ? edge.sourceHandle !== "next" : edge.sourceHandle === "next"));
+    if (stale.length) onEdgesChange(stale.map((edge) => ({ id: edge.id, type: "remove" as const })));
+    updateNodeData(node.id, { single_next: enabled });
+  };
+  const links = node.data.links ?? [];
+  const setLink = (index: number, patch: Partial<LinkAction>) =>
+    updateNodeData(node.id, { links: links.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)) });
+  const moveLink = (from: number | null, to: number) => {
+    setDragLinkIndex(null);
+    setDropLinkIndex(null);
+    if (from === null || from === to) return;
+    const reordered = links.slice();
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    updateNodeData(node.id, { links: reordered });
+  };
   const jumpRoutes = node.type === "condition"
     ? [{ handle: "true", label: "True" }, { handle: "false", label: "False" }]
+    : ["choice", "singleChoice", "multipleChoice"].includes(node.type) && node.data.single_next
+      ? [{ handle: "next", label: "Next" }]
     : ["choice", "singleChoice", "multipleChoice"].includes(node.type)
       ? [
           ...options.map((option, index) => ({ handle: `option-${index}`, label: option || `Option ${index + 1}` })),
@@ -403,6 +439,19 @@ export function PropertiesPanel() {
             onBlur={syncLabelFromEditor}
           />
           {labelMediaError ? <small className="label-format-error">{labelMediaError}</small> : null}
+          {variableChoices.length ? (
+            <div className="variable-insert">
+              <Braces size={14} />
+              <SpaghettiSelect
+                ariaLabel="Insert an earlier answer"
+                size="sm"
+                value=""
+                options={[{ value: "", label: "Insert an earlier answer…" }, ...variableChoices]}
+                onChange={insertVariable}
+              />
+            </div>
+          ) : null}
+          <small className="variable-hint">Write <code>{"{{variable}}"}</code> to show an earlier answer, e.g. "Thanks {"{{name}}"}".</small>
         </div>
 
         {inputTypes.has(node.type) ? (
@@ -461,6 +510,43 @@ export function PropertiesPanel() {
             >
               <Plus size={14} /> Add option
             </button>
+            {node.type === "multipleChoice" ? (
+              <div className="property-grid-two">
+                <label>
+                  Min selections
+                  <input
+                    type="number"
+                    min={0}
+                    value={node.data.min_selections ?? ""}
+                    placeholder={node.data.required === false ? "0" : "1"}
+                    onChange={(event) => updateNodeData(node.id, { min_selections: optionalNumber(event.target.value) })}
+                  />
+                </label>
+                <label>
+                  Max selections
+                  <input
+                    type="number"
+                    min={1}
+                    value={node.data.max_selections ?? ""}
+                    placeholder="No limit"
+                    onChange={(event) => updateNodeData(node.id, { max_selections: optionalNumber(event.target.value) })}
+                  />
+                </label>
+              </div>
+            ) : null}
+            {["choice", "singleChoice", "multipleChoice"].includes(node.type) ? (
+              <label className="checkbox-field checkbox-field-stacked">
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={node.data.single_next === true}
+                    onChange={(event) => setSingleNext(event.target.checked)}
+                  />
+                  Same next step for every choice
+                </span>
+                <small>The answer is saved but does not change the path: one "Next" connection instead of one per option.</small>
+              </label>
+            ) : null}
           </fieldset>
         ) : null}
 
@@ -532,56 +618,97 @@ export function PropertiesPanel() {
         {node.type === "links" ? (
           <fieldset className="links-editor">
             <legend>Links</legend>
-            {(node.data.links ?? []).map((link, index) => {
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={node.data.show_link_icons !== false}
+                onChange={(event) => updateNodeData(node.id, { show_link_icons: event.target.checked })}
+              />
+              Show each service's icon in the chat
+            </label>
+            {links.length > 1 ? <small className="links-reorder-hint">Drag the grip to change the order.</small> : null}
+            {links.map((link, index) => {
               const destination = linkDestinationConfig(link.link_type);
-              return <div className="linked-action-field" key={index}>
-                <label>
-                  Type
-                  <SpaghettiSelect ariaLabel={`Link ${index + 1} type`} value={link.link_type ?? "website"} options={linkTypeOptions} onChange={(linkType) => {
-                    const links = (node.data.links ?? []).map((item, itemIndex) => itemIndex === index ? {
-                      ...item,
-                      link_type: linkType,
-                      url: (item.link_type ?? "website") === linkType ? item.url : "",
-                    } : item);
-                    updateNodeData(node.id, { links });
-                  }} />
-                </label>
-                <label className="linked-action-destination">
-                  {destination.destinationLabel}
-                  <input
-                    type={destination.inputType}
-                    inputMode={destination.inputMode}
-                    value={link.url}
-                    placeholder={destination.placeholder}
-                    aria-label={`Link ${index + 1} ${destination.destinationLabel}`}
-                    onChange={(event) => {
-                    const links = (node.data.links ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item);
-                    updateNodeData(node.id, { links });
-                  }} />
-                </label>
-                <label>
-                  Label
-                  <input value={link.label} placeholder="Button label" onChange={(event) => {
-                    const links = (node.data.links ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item);
-                    updateNodeData(node.id, { links });
-                  }} />
-                </label>
-                <label className="linked-action-new-tab">
-                  New tab
-                  <input
-                    type="checkbox"
-                    checked={link.new_tab !== false}
-                    aria-label={`Open link ${index + 1} in a new tab`}
-                    onChange={(event) => {
-                      const links = (node.data.links ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, new_tab: event.target.checked } : item);
-                      updateNodeData(node.id, { links });
-                    }}
-                  />
-                </label>
-                <button className="mini-icon-button linked-action-delete" type="button" title="Delete link" aria-label={`Remove link ${index + 1}`} onClick={() => updateNodeData(node.id, { links: (node.data.links ?? []).filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={15} /></button>
-              </div>;
+              const classes = ["linked-action-card"];
+              if (dragLinkIndex === index) classes.push("is-dragging");
+              if (dropLinkIndex === index && dragLinkIndex !== index) classes.push("is-drop-target");
+              return (
+                <div
+                  className={classes.join(" ")}
+                  key={index}
+                  onDragOver={(event) => {
+                    if (dragLinkIndex === null) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    if (dropLinkIndex !== index) setDropLinkIndex(index);
+                  }}
+                  onDragLeave={() => setDropLinkIndex((current) => (current === index ? null : current))}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    moveLink(dragLinkIndex, index);
+                  }}
+                >
+                  <div className="linked-action-head">
+                    <button
+                      type="button"
+                      className="linked-action-grip"
+                      draggable
+                      title="Drag to reorder"
+                      aria-label={`Drag to reorder link ${index + 1}`}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", String(index));
+                        setDragLinkIndex(index);
+                      }}
+                      onDragEnd={() => {
+                        setDragLinkIndex(null);
+                        setDropLinkIndex(null);
+                      }}
+                    >
+                      <GripVertical size={15} />
+                    </button>
+                    <LinkIcon type={link.link_type} size={14} />
+                    <div className="linked-action-type">
+                      <SpaghettiSelect
+                        ariaLabel={`Link ${index + 1} type`}
+                        size="sm"
+                        value={link.link_type ?? "website"}
+                        options={linkTypeOptions}
+                        onChange={(linkType) => setLink(index, { link_type: linkType, url: (link.link_type ?? "website") === linkType ? link.url : "" })}
+                      />
+                    </div>
+                    <button className="mini-icon-button linked-action-delete" type="button" title="Delete link" aria-label={`Remove link ${index + 1}`} onClick={() => updateNodeData(node.id, { links: links.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 size={15} /></button>
+                  </div>
+                  <label>
+                    {destination.destinationLabel}
+                    <input
+                      type={destination.inputType}
+                      inputMode={destination.inputMode}
+                      value={link.url}
+                      placeholder={destination.placeholder}
+                      aria-label={`Link ${index + 1} ${destination.destinationLabel}`}
+                      onChange={(event) => setLink(index, { url: event.target.value })}
+                    />
+                  </label>
+                  <div className="linked-action-foot">
+                    <label>
+                      Label
+                      <input value={link.label} placeholder="Button label" aria-label={`Link ${index + 1} label`} onChange={(event) => setLink(index, { label: event.target.value })} />
+                    </label>
+                    <label className="linked-action-new-tab">
+                      New tab
+                      <input
+                        type="checkbox"
+                        checked={link.new_tab !== false}
+                        aria-label={`Open link ${index + 1} in a new tab`}
+                        onChange={(event) => setLink(index, { new_tab: event.target.checked })}
+                      />
+                    </label>
+                  </div>
+                </div>
+              );
             })}
-            <button className="secondary-button add-option-button" type="button" onClick={() => updateNodeData(node.id, { links: [...(node.data.links ?? []), { label: "New link", url: "", link_type: "website", new_tab: true }] })}><Plus size={14} /> Add link</button>
+            <button className="secondary-button add-option-button" type="button" onClick={() => updateNodeData(node.id, { links: [...links, { label: "New link", url: "", link_type: "website", new_tab: true }] })}><Plus size={14} /> Add link</button>
           </fieldset>
         ) : null}
 
@@ -850,6 +977,11 @@ export function PropertiesPanel() {
           <div className="jump-terminal-note">Node #{node.data.node_number} ends this path.</div>
         )}
 
+        {node.type !== "start" ? (
+          <button className="secondary-button node-duplicate-button" type="button" title="Make a copy of this node" onClick={() => duplicateNode(node.id)}>
+            <Copy size={15} /> Duplicate node
+          </button>
+        ) : null}
         {node.type !== "start" ? (
           <button
             className="danger-button"

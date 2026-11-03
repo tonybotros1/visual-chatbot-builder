@@ -14,6 +14,8 @@ export const updateBot = (botId: string, updates: Partial<Pick<BotRecord, "name"
     body: JSON.stringify(updates),
   });
 export const archiveBot = (botId: string) => apiFetch<void>(`/bots/${botId}`, { method: "DELETE" });
+/** A new draft bot owned by the caller with the same flow, languages and workspace. */
+export const duplicateBot = (botId: string) => apiFetch<BotRecord>(`/bots/${botId}/duplicate`, { method: "POST" });
 export const validateBot = (botId: string) =>
   apiFetch<ValidationReport>(`/bots/${botId}/validate`, { method: "POST" });
 export const publishBot = (botId: string) =>

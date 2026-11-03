@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -208,6 +209,47 @@ def _logic_loader(db: Session):
     return load
 
 
+_PLACEHOLDER_RE = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*}}")
+INTERPOLATED_FIELDS = ("label", "description", "whatsapp_message", "cta_label")
+
+
+def variable_text(value: Any) -> str:
+    """A collected answer as the visitor would read it back."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, list):
+        return ", ".join(variable_text(item) for item in value)
+    if isinstance(value, dict):
+        for key in ("name", "label", "title", "value"):
+            if isinstance(value.get(key), str):
+                return value[key]
+        return ""
+    return str(value)
+
+
+def interpolate_text(text: str, variables: dict[str, Any]) -> str:
+    """Replace {{variable}} placeholders with collected answers; unknown ones render as nothing."""
+    if "{{" not in text:
+        return text
+    return _PLACEHOLDER_RE.sub(lambda match: variable_text(variables.get(match.group(1))), text)
+
+
+def interpolate_node(node: dict[str, Any] | None, variables: dict[str, Any]) -> dict[str, Any] | None:
+    """A copy of a runtime node whose visible text has {{variable}} placeholders filled in."""
+    if not node:
+        return node
+    data = node.get("data") or {}
+    if not any(isinstance(data.get(field), str) and "{{" in data[field] for field in INTERPOLATED_FIELDS):
+        return node
+    filled = {**data}
+    for field in INTERPOLATED_FIELDS:
+        if isinstance(filled.get(field), str):
+            filled[field] = interpolate_text(filled[field], variables)
+    return {**node, "data": filled}
+
+
 def _state(
     conversation: Conversation,
     messages: list[dict[str, Any]],
@@ -216,12 +258,13 @@ def _state(
     settings: dict[str, Any] | None = None,
     progress_percent: float = 0,
 ) -> ConversationState:
+    variables = conversation.variables or {}
     return ConversationState(
         conversation_id=conversation.id,
         session_id=conversation.session_id,
         status=conversation.status,
-        messages=[RuntimeNode.model_validate(item) for item in messages],
-        next_node=RuntimeNode.model_validate(next_node) if next_node else None,
+        messages=[RuntimeNode.model_validate(interpolate_node(item, variables)) for item in messages],
+        next_node=RuntimeNode.model_validate(interpolate_node(next_node, variables)) if next_node else None,
         variables=conversation.variables or {},
         trace=(conversation.runtime_state or {}).get("trace", [])
         if (conversation.runtime_state or {}).get("debug")

@@ -148,13 +148,16 @@ def validate_flow(
                 for edge in edges
                 if edge.get("source") == node_id
             }
-            missing_handles = [
-                f"option-{index}"
-                for index in range(len(options))
-                if f"option-{index}" not in connected_handles
-            ]
-            if node.get("data", {}).get("required", True) is False and "skip" not in connected_handles:
-                missing_handles.append("skip")
+            if node.get("data", {}).get("single_next"):
+                missing_handles = [] if "next" in connected_handles else ["next"]
+            else:
+                missing_handles = [
+                    f"option-{index}"
+                    for index in range(len(options))
+                    if f"option-{index}" not in connected_handles
+                ]
+                if node.get("data", {}).get("required", True) is False and "skip" not in connected_handles:
+                    missing_handles.append("skip")
             if missing_handles:
                 issues.append(
                     ValidationIssue(
@@ -397,7 +400,11 @@ def validate_flow_connections(
             reasons.append("is not connected to Start")
 
         connected_handles = {str(edge.get("sourceHandle") or "") for edge in outgoing[node_id]}
-        if node_type in branching_types:
+        if node_type in branching_types and data.get("single_next"):
+            missing_routes = [] if "next" in connected_handles else ["Next"]
+            if missing_routes:
+                reasons.append("has no next step connected")
+        elif node_type in branching_types:
             options = data.get("options") or []
             missing_routes = [
                 str(option or f"Option {index + 1}")

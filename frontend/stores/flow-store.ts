@@ -478,11 +478,45 @@ const nodeDefaults: Record<BuilderNodeType, BuilderNodeData> = {
   end: { label: "End" },
 };
 
+/** What undo restores: the whole editable document, never the view state. */
+export type FlowSnapshot = {
+  nodes: BuilderNode[];
+  edges: BuilderEdge[];
+  appearance: FlowAppearance;
+  settings: FlowSettings;
+};
+
+const HISTORY_LIMIT = 80;
+/** Typing into one field fires a change per keystroke; edits with the same key within this window share one undo step. */
+const EDIT_GROUP_MS = 1200;
+let lastEditKey = "";
+let lastEditAt = 0;
+let dragRecorded = false;
+
+function snapshotOf(state: Pick<FlowState, "nodes" | "edges" | "appearance" | "settings">): FlowSnapshot {
+  return { nodes: state.nodes, edges: state.edges, appearance: state.appearance, settings: state.settings };
+}
+
+/** The history fields for a state about to change. `key` groups rapid edits of the same field into one step. */
+function remember(state: FlowState, key = ""): Pick<FlowState, "history" | "future"> {
+  const now = Date.now();
+  if (key && key === lastEditKey && now - lastEditAt < EDIT_GROUP_MS) {
+    lastEditAt = now;
+    return { history: state.history, future: state.future };
+  }
+  lastEditKey = key;
+  lastEditAt = now;
+  return { history: [...state.history.slice(-(HISTORY_LIMIT - 1)), snapshotOf(state)], future: [] };
+}
+
 type FlowState = {
   nodes: BuilderNode[];
   edges: BuilderEdge[];
   appearance: FlowAppearance;
   settings: FlowSettings;
+  /** Undo stack (oldest first) and redo stack; cleared when a flow loads. */
+  history: FlowSnapshot[];
+  future: FlowSnapshot[];
   selectedNodeId: string | null;
   searchQuery: string;
   layoutRevision: number;
@@ -507,6 +541,11 @@ type FlowState = {
     label?: string,
   ) => void;
   addNode: (type: BuilderNodeType, position: XYPosition) => void;
+  /** A copy of the node placed just below-right of the original, selected and ready to edit. */
+  duplicateNode: (nodeId: string) => void;
+  removeEdge: (edgeId: string) => void;
+  undo: () => void;
+  redo: () => void;
   updateNodeData: (nodeId: string, updates: Partial<BuilderNodeData>) => void;
   updateAppearance: (updates: Partial<FlowAppearance>) => void;
   updateSettings: (updates: Partial<FlowSettings>) => void;
@@ -548,6 +587,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   edges: [],
   appearance: { ...defaultFlowAppearance },
   settings: { ...defaultFlowSettings },
+  history: [],
+  future: [],
   selectedNodeId: null,
   searchQuery: "",
   layoutRevision: 0,
@@ -560,9 +601,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   onNodesChange: (changes) =>
     set((state) => {
+      // Record one undo step per structural change and one per drag (at its first move, before anything moved).
+      let record = changes.some((change) => change.type === "add" || change.type === "remove");
+      for (const change of changes) {
+        if (change.type !== "position") continue;
+        if (change.dragging) {
+          if (!dragRecorded) {
+            record = true;
+            dragRecorded = true;
+          }
+        } else {
+          dragRecorded = false;
+        }
+      }
       const nodes = applyNodeChanges(changes, state.nodes);
       const edges = sanitizeEdges(nodes, state.edges);
       return {
+        ...(record ? remember(state) : {}),
         nodes,
         edges,
         isDirty:
@@ -576,6 +631,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   onEdgesChange: (changes) =>
     set((state) => ({
+      ...(changes.some((change) => change.type === "add" || change.type === "remove") ? remember(state) : {}),
       edges: sanitizeEdges(state.nodes, applyEdgeChanges(changes, state.edges)),
       isDirty:
         state.isDirty ||
@@ -584,6 +640,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   onConnect: (connection) =>
     set((state) => ({
+      ...remember(state),
       edges: sanitizeEdges(
         state.nodes,
         addEdge({ ...connection, ...edgeDefaults }, state.edges),
@@ -615,6 +672,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         : remainingEdges;
 
       return {
+        ...remember(state),
         edges: sanitizeEdges(state.nodes, edges),
         isDirty: true,
       };
@@ -628,6 +686,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         ...state.nodes.map((node) => node.data.node_number ?? 0),
       ) + 1;
       return {
+        ...remember(state),
         nodes: [
           ...state.nodes,
           {
@@ -645,8 +704,64 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
     }),
 
+  duplicateNode: (nodeId) =>
+    set((state) => {
+      const source = state.nodes.find((node) => node.id === nodeId);
+      if (!source || source.type === "start") return state;
+      const id = `${source.type}-${randomId()}`;
+      const nextNodeNumber = Math.max(0, ...state.nodes.map((node) => node.data.node_number ?? 0)) + 1;
+      const copy: BuilderNode = {
+        id,
+        type: source.type,
+        position: { x: source.position.x + 48, y: source.position.y + 48 },
+        data: { ...cloneNodeData(source.data), node_number: nextNodeNumber },
+        selected: false,
+      };
+      return {
+        ...remember(state),
+        nodes: [...state.nodes.map((node) => ({ ...node, selected: false })), copy],
+        selectedNodeId: id,
+        isDirty: true,
+      };
+    }),
+
+  removeEdge: (edgeId) =>
+    set((state) => {
+      if (!state.edges.some((edge) => edge.id === edgeId)) return state;
+      return { ...remember(state), edges: state.edges.filter((edge) => edge.id !== edgeId), isDirty: true };
+    }),
+
+  undo: () =>
+    set((state) => {
+      const previous = state.history[state.history.length - 1];
+      if (!previous) return state;
+      lastEditKey = "";
+      return {
+        ...previous,
+        history: state.history.slice(0, -1),
+        future: [...state.future, snapshotOf(state)],
+        selectedNodeId: previous.nodes.some((node) => node.id === state.selectedNodeId) ? state.selectedNodeId : null,
+        isDirty: true,
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      const next = state.future[state.future.length - 1];
+      if (!next) return state;
+      lastEditKey = "";
+      return {
+        ...next,
+        history: [...state.history, snapshotOf(state)],
+        future: state.future.slice(0, -1),
+        selectedNodeId: next.nodes.some((node) => node.id === state.selectedNodeId) ? state.selectedNodeId : null,
+        isDirty: true,
+      };
+    }),
+
   updateNodeData: (nodeId, updates) =>
     set((state) => ({
+      ...remember(state, `data:${nodeId}:${Object.keys(updates).sort().join(",")}`),
       nodes: state.nodes.map((node) =>
         node.id === nodeId ? { ...node, data: { ...node.data, ...updates } } : node,
       ),
@@ -655,12 +770,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   updateAppearance: (updates) =>
     set((state) => ({
+      ...remember(state, `appearance:${Object.keys(updates).sort().join(",")}`),
       appearance: { ...state.appearance, ...updates },
       isDirty: true,
     })),
 
   updateSettings: (updates) =>
     set((state) => ({
+      ...remember(state, `settings:${Object.keys(updates).sort().join(",")}`),
       settings: { ...state.settings, ...updates },
       isDirty: true,
     })),
@@ -694,6 +811,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   resetTreeNudges: () => set({ treeOffsets: {} }),
   formatLayout: () =>
     set((state) => ({
+      ...remember(state),
       nodes: autoLayoutNodes(state.nodes, state.edges),
       treeOffsets: {},
       layoutRevision: state.layoutRevision + 1,
@@ -701,7 +819,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     })),
 
   clearGraph: () =>
-    set({ nodes: [], edges: [], selectedNodeId: null, collapsedNodeIds: [], treeOffsets: {}, graphLoading: true, isDirty: false }),
+    set({ nodes: [], edges: [], history: [], future: [], selectedNodeId: null, collapsedNodeIds: [], treeOffsets: {}, graphLoading: true, isDirty: false }),
   markGraphReady: () => set({ graphLoading: false }),
   setGraph: (document) => {
     const nodes = cleanNodes(document.nodes);
@@ -719,6 +837,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: sanitized.map((edge) => ({ ...edge, ...edgeDefaults })),
       appearance: loadedAppearance,
       settings: { ...defaultFlowSettings, ...(document.settings ?? {}) },
+      history: [],
+      future: [],
       selectedNodeId: null,
       treeOffsets: {},
       graphLoading: false,

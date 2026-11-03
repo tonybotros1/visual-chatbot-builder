@@ -558,6 +558,7 @@ def custom_domain_bootstrap(
 def deployment_start(
     deployment_key: str,
     payload: ConversationStart,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
 ) -> ConversationState:
     deployment, _, version = _public_deployment(deployment_key, db)
@@ -572,6 +573,7 @@ def deployment_start(
         debug=False,
         source=f"deployment:{deployment.mode}",
         metadata={**payload.metadata, "deployment_key": deployment.deployment_key, "environment": deployment.environment},
+        request=request,
     )
 
 

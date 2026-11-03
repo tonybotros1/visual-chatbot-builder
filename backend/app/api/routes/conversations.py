@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
-from sqlalchemy import func, select
+from sqlalchemy import String, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -28,6 +28,7 @@ from app.schemas.conversation import (
 from app.services.conversation_service import start_conversation, submit_answer
 from app.services.response_exports import csv_bytes, json_bytes, response_rows, xlsx_bytes
 from app.services.providers import delete_file_content
+from app.services.visitor_context import visitor_context
 
 
 router = APIRouter()
@@ -50,17 +51,19 @@ def _version_for_bot(db: Session, bot_id: UUID, *, draft: bool) -> BotVersion:
 def preview_start(
     bot_id: UUID,
     payload: ConversationStart,
+    request: Request,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ConversationState:
     owned_bot(bot_id, user, db)
-    return _start(db, _version_for_bot(db, bot_id, draft=True), payload, debug=True, source="preview")
+    return _start(db, _version_for_bot(db, bot_id, draft=True), payload, debug=True, source="preview", request=request)
 
 
 @public_router.post("/{identifier}/start", response_model=ConversationState)
 def public_start(
     identifier: str,
     payload: ConversationStart,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
 ) -> ConversationState:
     try:
@@ -70,7 +73,7 @@ def public_start(
         bot = db.scalar(select(Bot).where(Bot.slug == identifier))
     if bot is None or bot.status != "published":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Published bot not found")
-    return _start(db, _version_for_bot(db, bot.id, draft=False), payload, debug=False, source="public")
+    return _start(db, _version_for_bot(db, bot.id, draft=False), payload, debug=False, source="public", request=request)
 
 
 @router.post("/conversations/{conversation_id}/answer", response_model=ConversationState)
@@ -109,7 +112,16 @@ def responses(
     if tag:
         query = query.where(Conversation.tags.contains([tag]))
     if search:
-        query = query.where(Conversation.session_id.ilike(f"%{search}%"))
+        needle = f"%{search}%"
+        answered = select(ConversationAnswer.conversation_id).where(ConversationAnswer.value.cast(String).ilike(needle))
+        query = query.where(
+            or_(
+                Conversation.session_id.ilike(needle),
+                Conversation.variables.cast(String).ilike(needle),
+                Conversation.context_data.cast(String).ilike(needle),
+                Conversation.id.in_(answered),
+            )
+        )
     items = list(
         db.scalars(
             query.order_by(Conversation.started_at.desc()).offset(offset).limit(limit)
@@ -227,9 +239,12 @@ def _start(
     debug: bool,
     source: str = "public",
     metadata: dict | None = None,
+    request: Request | None = None,
 ) -> ConversationState:
+    # What the browser sent (page, referrer, language...) plus what only the server sees (address, device, location).
+    context = {**payload.metadata, **(metadata or {}), **visitor_context(request)}
     try:
-        return start_conversation(db, version, session_id=payload.session_id, debug=debug, source=source, metadata=metadata or payload.metadata, locale=payload.locale)
+        return start_conversation(db, version, session_id=payload.session_id, debug=debug, source=source, metadata=context, locale=payload.locale)
     except EngineError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 

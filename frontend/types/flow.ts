@@ -66,6 +66,10 @@ export type BuilderNodeData = {
   step?: number;
   min_selections?: number;
   max_selections?: number;
+  /** Choice nodes: every option continues to the same next node (the answer is recorded but does not branch). */
+  single_next?: boolean;
+  /** Links node: show the service's icon next to each link in the chat (default on). */
+  show_link_icons?: boolean;
   min_date?: string;
   max_date?: string;
   file_types?: string[];

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { ExternalLink, RefreshCw, Send, Star } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { RichText } from "@/components/content/RichText";
+import { LinkIcon } from "@/components/chatbot/LinkIcon";
 import { getRuntimeStrings } from "./runtime-strings";
 import { DatePicker } from "./DatePicker";
 import { answerConversation, deploymentBootstrap, startDeployment, startPreview, startPublic } from "@/services/conversations";
@@ -316,7 +317,8 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
                     target={link.new_tab !== false ? "_blank" : undefined}
                     rel={link.new_tab !== false ? "noreferrer" : undefined}
                   >
-                    {link.label || "Open link"}<ExternalLink size={13} />
+                    {message.node?.data.show_link_icons !== false ? <LinkIcon type={link.link_type} size={13} /> : null}
+                    <span>{link.label || "Open link"}</span><ExternalLink size={13} />
                   </a>
                 ))}
               </div>

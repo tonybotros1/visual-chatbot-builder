@@ -2,6 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import { BaseEdge, Position, type EdgeProps } from "@xyflow/react";
+import { EdgeRemoveButton } from "./EdgeRemoveButton";
 import { useFlowStore } from "@/stores/flow-store";
 import type { BuilderEdge, BuilderNode } from "@/types/flow";
 
@@ -165,6 +166,7 @@ function buildRoute(
 }
 
 export function ObstacleAwareEdge({
+  id,
   source,
   target,
   sourceX,
@@ -217,20 +219,23 @@ export function ObstacleAwareEdge({
   const labelPoint = routeMidpoint(points);
 
   return (
-    <BaseEdge
-      path={roundedPath(points)}
-      markerStart={markerStart}
-      markerEnd={markerEnd}
-      style={style}
-      label={label}
-      labelX={labelPoint.x}
-      labelY={labelPoint.y}
-      labelStyle={labelStyle}
-      labelShowBg={labelShowBg}
-      labelBgStyle={labelBgStyle}
-      labelBgPadding={labelBgPadding}
-      labelBgBorderRadius={labelBgBorderRadius}
-      interactionWidth={interactionWidth}
-    />
+    <>
+      <BaseEdge
+        path={roundedPath(points)}
+        markerStart={markerStart}
+        markerEnd={markerEnd}
+        style={style}
+        label={label}
+        labelX={labelPoint.x}
+        labelY={labelPoint.y}
+        labelStyle={labelStyle}
+        labelShowBg={labelShowBg}
+        labelBgStyle={labelBgStyle}
+        labelBgPadding={labelBgPadding}
+        labelBgBorderRadius={labelBgBorderRadius}
+        interactionWidth={interactionWidth}
+      />
+      <EdgeRemoveButton edgeId={id} x={labelPoint.x} y={labelPoint.y} />
+    </>
   );
 }

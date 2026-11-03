@@ -1,6 +1,7 @@
 "use client";
 
 import { BaseEdge, Position, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
+import { EdgeRemoveButton } from "./EdgeRemoveButton";
 import type { BuilderEdge } from "@/types/flow";
 
 /**
@@ -9,6 +10,7 @@ import type { BuilderEdge } from "@/types/flow";
  * their row, so those paths leave sideways first and then drop to the child.
  */
 export function TreeEdge({
+  id,
   sourceX,
   sourceY,
   targetX,
@@ -36,19 +38,22 @@ export function TreeEdge({
     offset: leavesSideways ? 24 : 20,
   });
   return (
-    <BaseEdge
-      path={path}
-      markerEnd={markerEnd}
-      style={style}
-      label={label}
-      labelX={labelX}
-      labelY={labelY}
-      labelStyle={labelStyle}
-      labelShowBg={labelShowBg}
-      labelBgStyle={labelBgStyle}
-      labelBgPadding={labelBgPadding}
-      labelBgBorderRadius={labelBgBorderRadius}
-      interactionWidth={interactionWidth}
-    />
+    <>
+      <BaseEdge
+        path={path}
+        markerEnd={markerEnd}
+        style={style}
+        label={label}
+        labelX={labelX}
+        labelY={labelY}
+        labelStyle={labelStyle}
+        labelShowBg={labelShowBg}
+        labelBgStyle={labelBgStyle}
+        labelBgPadding={labelBgPadding}
+        labelBgBorderRadius={labelBgBorderRadius}
+        interactionWidth={interactionWidth}
+      />
+      <EdgeRemoveButton edgeId={id} x={labelX} y={labelY} />
+    </>
   );
 }
