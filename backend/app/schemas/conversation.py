@@ -44,6 +44,10 @@ class AnswerRead(BaseModel):
     variable_name: str
     value: Any
     created_at: datetime
+    # The question the visitor saw (node label as plain text); empty when the node no longer exists.
+    question: str = ""
+    # The answer as the visitor saw it (option labels instead of stored option values); empty when not applicable.
+    answer_text: str = ""
 
     model_config = {"from_attributes": True}
 
@@ -51,6 +55,8 @@ class AnswerRead(BaseModel):
 class ConversationRead(BaseModel):
     id: UUID
     session_id: str
+    # 1-based position of this conversation among the bot's conversations, oldest first.
+    response_number: int = 0
     status: str
     current_node_id: str | None
     variables: dict[str, Any]

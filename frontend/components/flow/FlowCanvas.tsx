@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, type Ref } from "react";
+import { useCallback, useEffect, useMemo, useState, type Ref } from "react";
 import { useRouter } from "next/navigation";
 import {
   Background,
@@ -11,6 +11,7 @@ import {
   useReactFlow,
   useUpdateNodeInternals,
   type EdgeTypes,
+  type NodeChange,
   type NodeTypes,
 } from "@xyflow/react";
 import { CANVAS_LAYOUT_KEY, CANVAS_VIEW_KEY, useFlowStore } from "@/stores/flow-store";
@@ -120,6 +121,17 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   const setLayoutMode = useFlowStore((state) => state.setLayoutMode);
   const collapsedNodeIds = useFlowStore((state) => state.collapsedNodeIds);
   const toggleCollapsed = useFlowStore((state) => state.toggleCollapsed);
+  const treeOffsets = useFlowStore((state) => state.treeOffsets);
+  const nudgeTreeNode = useFlowStore((state) => state.nudgeTreeNode);
+  const graphLoading = useFlowStore((state) => state.graphLoading);
+  // Nodes fade in for a moment after a flow arrives; the canvas itself is visible the whole time.
+  const [entering, setEntering] = useState(false);
+  useEffect(() => {
+    if (graphLoading) return;
+    setEntering(true);
+    const timer = window.setTimeout(() => setEntering(false), 700);
+    return () => window.clearTimeout(timer);
+  }, [graphLoading]);
   const { fitView, screenToFlowPosition, setCenter } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -139,6 +151,29 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   const tree = useMemo(
     () => (layoutMode === "tree" ? buildTreeLayout(nodes, edges, new Set(collapsedNodeIds)) : null),
     [collapsedNodeIds, edges, layoutMode, nodes],
+  );
+
+  // Tree mode: dragging a node in the tree records how far it was nudged from its slot (the saved flow
+  // positions stay untouched); detached nodes have no slot, so they move like in the flow layout.
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<BuilderNode>[]) => {
+      if (!tree) {
+        onNodesChange(changes);
+        return;
+      }
+      const forwarded: NodeChange<BuilderNode>[] = [];
+      for (const change of changes) {
+        if (change.type !== "position" || tree.detached.has(change.id) || !tree.positions.has(change.id)) {
+          forwarded.push(change);
+          continue;
+        }
+        if (!change.position) continue;
+        const slot = tree.positions.get(change.id)!;
+        nudgeTreeNode(change.id, { x: change.position.x - slot.x, y: change.position.y - slot.y });
+      }
+      if (forwarded.length) onNodesChange(forwarded);
+    },
+    [nudgeTreeNode, onNodesChange, tree],
   );
 
   // Switching layouts moves every handle, so refresh node internals and refit once.
@@ -193,15 +228,16 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
     }
     return nodes.map((node) => {
       const folded = collapsedNodeIds.includes(node.id) && (tree.childCount.get(node.id) ?? 0) > 0;
+      const slot = tree.positions.get(node.id) ?? node.position;
+      const nudge = tree.detached.has(node.id) ? null : treeOffsets[node.id];
       return {
         ...node,
-        position: tree.positions.get(node.id) ?? node.position,
+        position: nudge ? { x: slot.x + nudge.x, y: slot.y + nudge.y } : slot,
         hidden: tree.hidden.has(node.id),
-        draggable: false,
         className: [emphasis(node), "is-tree-node", folded ? "is-collapsed" : ""].filter(Boolean).join(" "),
       };
     });
-  }, [collapsedNodeIds, focusIds, nodes, searchQuery, tree]);
+  }, [collapsedNodeIds, focusIds, nodes, searchQuery, tree, treeOffsets]);
 
   const displayEdges = useMemo(() => {
     const focusClass = (edge: BuilderEdge) =>
@@ -252,14 +288,14 @@ export function FlowCanvas({ canvasRef }: { canvasRef?: Ref<HTMLDivElement> }) {
   }, [fitView, layoutRevision, updateNodeInternals]);
 
   return (
-    <div ref={canvasRef} className={`flow-canvas${viewMode === "compact" ? " is-compact" : ""}${layoutMode === "tree" ? " is-tree" : ""}`} onDragOver={onDragOver} onDrop={onDrop}>
+    <div ref={canvasRef} className={`flow-canvas${viewMode === "compact" ? " is-compact" : ""}${layoutMode === "tree" ? " is-tree" : ""}${entering ? " is-entering" : ""}`} onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: "obstacle" }}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onPaneClick={() => selectNode(null)}

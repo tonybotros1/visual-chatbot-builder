@@ -65,9 +65,24 @@ def main() -> None:
     assert request("/auth/me", token=token)["id"] == login["user"]["id"]
 
     test_bot_id: str | None = None
+    workspace_id: str | None = None
     try:
-        bot = request("/bots", method="POST", payload={"name": f"V1 smoke {run_id}", "description": "Temporary V1 verification bot"}, token=token)
+        workspace = request("/workspaces", method="POST", payload={"name": f"Smoke workspace {run_id}"}, token=token)
+        workspace_id = workspace["id"]
+        bot = request("/bots", method="POST", payload={"name": f"V1 smoke {run_id}", "description": "Temporary V1 verification bot", "workspace_id": workspace_id}, token=token)
         test_bot_id = bot["id"]
+        assert bot["workspace_id"] == workspace_id
+        listed = next(item for item in request("/workspaces", token=token) if item["id"] == workspace_id)
+        assert listed["bot_count"] == 1, listed
+        moved = request(f"/bots/{test_bot_id}", method="PUT", payload={"workspace_id": None}, token=token)
+        assert moved["workspace_id"] is None
+        moved_back = request(f"/bots/{test_bot_id}", method="PUT", payload={"workspace_id": workspace_id}, token=token)
+        assert moved_back["workspace_id"] == workspace_id
+        renamed = request(f"/workspaces/{workspace_id}", method="PUT", payload={"name": f"Smoke workspace {run_id} renamed"}, token=token)
+        assert renamed["name"].endswith("renamed") and renamed["bot_count"] == 1
+        request(f"/workspaces/{workspace_id}", method="DELETE", token=token)
+        workspace_id = None
+        assert request(f"/bots/{test_bot_id}", token=token)["workspace_id"] is None
         saved_flow = request(f"/bots/{test_bot_id}/flow", method="PUT", payload=DEFAULT_FLOW, token=token)
         # The API also returns appearance/settings defaults added after V1; the submitted graph must round-trip intact.
         assert {key: saved_flow.get(key) for key in DEFAULT_FLOW} == DEFAULT_FLOW
@@ -90,6 +105,8 @@ def main() -> None:
         with urlopen(FRONTEND_URL, timeout=15) as frontend_response: assert frontend_response.status == 200
         print(json.dumps({"health": health["status"], "authenticated_user": login["user"]["email"], "bot": bot["name"], "validation": validation["valid"], "published_version": published["version"]["version_number"], "preview_status": preview_done["status"], "public_status": public_done["status"], "responses_visible": len(responses), "frontend_status": 200}, indent=2))
     finally:
+        if workspace_id:
+            request(f"/workspaces/{workspace_id}", method="DELETE", token=token)
         if test_bot_id:
             with SessionLocal() as session:
                 session.execute(delete(Bot).where(Bot.id == UUID(test_bot_id)))

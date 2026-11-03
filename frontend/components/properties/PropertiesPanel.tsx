@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Bold, Check, ChevronDown, ImagePlus, Italic, Link2, List, ListOrdered, Plus, Strikethrough, Trash2, Underline, X } from "lucide-react";
+import { Bold, ImagePlus, Italic, Link2, List, ListOrdered, Plus, Strikethrough, Trash2, Underline, X } from "lucide-react";
 import { listSubflows, listSubflowVersions } from "@/services/subflows";
 import { listLogicAssets, listLogicVersions } from "@/services/logic";
 import { listIntegrations } from "@/services/integrations";
 import { confirmNodeDeletion, promptDialog } from "@/stores/dialog-store";
 import { useFlowStore } from "@/stores/flow-store";
 import { richTextToPlainText, richTextToSafeHtml } from "@/components/content/RichText";
+import { Select as SpaghettiSelect } from "@/components/ui/Select";
 import type { IntegrationConnection, LogicAssetRecord, LogicVersion, SubflowRecord, SubflowVersion } from "@/types/api";
 
 const inputTypes = new Set([
@@ -63,83 +64,6 @@ function linkDestinationConfig(linkType?: string) {
 
 function optionalNumber(value: string): number | undefined {
   return value === "" ? undefined : Number(value);
-}
-
-type SpaghettiSelectOption = {
-  value: string;
-  label: string;
-};
-
-function SpaghettiSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  disabled = false,
-}: {
-  value: string;
-  options: readonly SpaghettiSelectOption[];
-  onChange: (value: string) => void;
-  ariaLabel: string;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.value === value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
-  return (
-    <div className={`spaghetti-select${open ? " is-open" : ""}`} ref={root}>
-      <button
-        className="spaghetti-select-trigger"
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{selected?.label ?? "Choose an option"}</span>
-        <ChevronDown size={15} aria-hidden="true" />
-      </button>
-      {open ? (
-        <div className="spaghetti-select-menu" role="listbox" aria-label={`${ariaLabel} options`}>
-          {options.map((option) => (
-            <button
-              className="spaghetti-select-option"
-              type="button"
-              role="option"
-              aria-selected={option.value === value}
-              title={option.label}
-              key={option.value}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-            >
-              <span>{option.label}</span>
-              {option.value === value ? <Check size={14} aria-hidden="true" /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function safeEditorLink(url: string) {
@@ -594,8 +518,8 @@ export function PropertiesPanel() {
         {node.type === "fileUpload" ? (
           <fieldset>
             <legend>File restrictions</legend>
-            <div className="provider-shell-notice">Local signed storage and malware screening work immediately. Select object storage after connecting it under Integrations.</div>
-            <label>Storage<SpaghettiSelect ariaLabel="Storage" value={node.data.storage_provider ?? "local"} options={[{ value: "local", label: "Local secure storage" }, { value: "object", label: "Connected object storage" }]} onChange={(storageProvider) => updateNodeData(node.id, { storage_provider: storageProvider, provider_connection_id: storageProvider === "local" ? undefined : node.data.provider_connection_id })} /></label>
+            <div className="provider-shell-notice">Platform storage (Azure Blob Storage on this server) with malware screening works immediately. Pick a connected storage only when this bot needs its own container or bucket.</div>
+            <label>Storage<SpaghettiSelect ariaLabel="Storage" value={node.data.storage_provider ?? "local"} options={[{ value: "local", label: "Platform storage (default)" }, { value: "object", label: "Connected object storage" }]} onChange={(storageProvider) => updateNodeData(node.id, { storage_provider: storageProvider, provider_connection_id: storageProvider === "local" ? undefined : node.data.provider_connection_id })} /></label>
             {node.data.storage_provider === "object" ? <label>Storage connection<SpaghettiSelect ariaLabel="Storage connection" value={node.data.provider_connection_id ?? ""} options={[{ value: "", label: "Choose storage connection" }, ...connections.filter((item) => item.kind === "storage" && item.status === "active").map((item) => ({ value: item.id, label: item.name }))]} onChange={(connectionId) => updateNodeData(node.id, { provider_connection_id: connectionId || undefined })} /></label> : null}
             <label>Allowed MIME types<input value={(node.data.file_types ?? []).join(", ")} onChange={(event) => updateNodeData(node.id, { file_types: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></label>
             <div className="property-grid-two">

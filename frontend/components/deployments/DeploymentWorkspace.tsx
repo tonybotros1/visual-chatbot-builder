@@ -1,5 +1,7 @@
 "use client";
 
+import { copyText } from "@/services/clipboard";
+import { Select } from "@/components/ui/Select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,20 +20,20 @@ import {
   updateDeployment,
   createDomain, deleteDomain, listDomains, verifyDomain,
 } from "@/services/deployments";
+import { apiBaseUrl } from "@/services/api";
+import { usePublicSiteUrl } from "@/hooks/usePublicSiteUrl";
 import type { CustomDomain, DeploymentMode, DeploymentRecord, TargetSegment } from "@/types/api";
 
 
-const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
-const siteBase = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
-function snippet(item: DeploymentRecord) {
+function snippet(item: DeploymentRecord, siteBase: string) {
   if (item.mode === "link") return `${siteBase}/chat/deployed?deployment=${item.deployment_key}`;
   const target = item.mode === "embed" ? ' data-target="#chatbot-container"' : "";
-  return `<script async src="${apiBase}/public/sdk/v1.js" data-deployment="${item.deployment_key}"${target}></script>`;
+  return `<script async src="${apiBaseUrl()}/public/sdk/v1.js" data-deployment="${item.deployment_key}"${target}></script>`;
 }
 
 export function DeploymentWorkspace({ botId }: { botId: string }) {
   const router = useRouter();
+  const siteBase = usePublicSiteUrl();
   const [botName, setBotName] = useState("Deployments");
   const [deployments, setDeployments] = useState<DeploymentRecord[]>([]);
   const [segments, setSegments] = useState<TargetSegment[]>([]);
@@ -103,8 +105,8 @@ export function DeploymentWorkspace({ botId }: { botId: string }) {
           <form className="deployment-card" onSubmit={addDeployment}>
             <div><p className="eyebrow">New channel</p><h2>Create deployment</h2></div>
             <label>Name<input value={name} onChange={(event) => setName(event.target.value)} required /></label>
-            <div className="deployment-fields"><label>Mode<select value={mode} onChange={(event) => setMode(event.target.value as DeploymentMode)}><option value="widget">Widget</option><option value="embed">Inline embed</option><option value="link">Share link</option></select></label><label>Environment<select value={environment} onChange={(event) => setEnvironment(event.target.value as DeploymentRecord["environment"])}><option value="development">Development</option><option value="staging">Staging</option><option value="production">Production</option></select></label></div>
-            <label>Audience segment<select value={segmentId} onChange={(event) => setSegmentId(event.target.value)}><option value="">No reusable segment</option>{segments.map((segment) => <option value={segment.id} key={segment.id}>{segment.name}</option>)}</select></label>
+            <div className="deployment-fields"><label>Mode<Select ariaLabel="Mode" value={mode} options={[{ value: "widget", label: "Widget" }, { value: "embed", label: "Inline embed" }, { value: "link", label: "Share link" }]} onChange={(value) => setMode(value as DeploymentMode)} /></label><label>Environment<Select ariaLabel="Environment" value={environment} options={[{ value: "development", label: "Development" }, { value: "staging", label: "Staging" }, { value: "production", label: "Production" }]} onChange={(value) => setEnvironment(value as DeploymentRecord["environment"])} /></label></div>
+            <label>Audience segment<Select ariaLabel="Audience segment" value={segmentId} options={[{ value: "", label: "No reusable segment" }, ...segments.map((segment) => ({ value: segment.id, label: segment.name }))]} onChange={setSegmentId} /></label>
             <label>Appearance and behavior JSON<textarea spellCheck={false} value={configText} onChange={(event) => setConfigText(event.target.value)} /></label>
             <label>Page, device, schedule, and frequency rules<textarea spellCheck={false} value={rulesText} onChange={(event) => setRulesText(event.target.value)} /></label>
             <button className="primary-button" type="submit"><Plus size={15} /> Create deployment</button>
@@ -123,10 +125,10 @@ export function DeploymentWorkspace({ botId }: { botId: string }) {
           {selected ? (
             <article className="deployment-detail">
               <div className="deployment-detail-heading"><div><h3>{selected.name}</h3><p>Pinned version ID: {selected.bot_version_id}</p></div><span className="status-pill">{selected.status}</span></div>
-              <label>{selected.mode === "link" ? "Share URL" : "Installation snippet"}<textarea readOnly value={snippet(selected)} /></label>
+              <label>{selected.mode === "link" ? "Share URL" : "Installation snippet"}<textarea readOnly value={snippet(selected, siteBase)} /></label>
               <div className="deployment-actions">
-                <button className="secondary-button" type="button" onClick={() => void navigator.clipboard.writeText(snippet(selected)).then(() => setMessage("Installation code copied"))}><Clipboard size={14} /> Copy</button>
-                {selected.mode === "link" ? <a className="secondary-button" href={snippet(selected)} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a> : null}
+                <button className="secondary-button" type="button" onClick={() => void copyText(snippet(selected, siteBase)).then(() => setMessage("Installation code copied"))}><Clipboard size={14} /> Copy</button>
+                {selected.mode === "link" ? <a className="secondary-button" href={snippet(selected, siteBase)} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a> : null}
                 <button className="secondary-button" type="button" onClick={() => void refreshDeploymentVersion(selected.id).then((item) => { replaceDeployment(item); setMessage("Pinned to the newest published version"); })}><RefreshCw size={14} /> Latest version</button>
                 <button className="secondary-button" type="button" onClick={() => void updateDeployment(selected.id, { status: selected.status === "paused" ? "active" : "paused" }).then(replaceDeployment)}><Pause size={14} /> {selected.status === "paused" ? "Activate" : "Pause"}</button>
                 <button className="secondary-button" type="button" onClick={() => void confirmDialog({ title: `Archive “${selected.name}”?`, message: "Its installation snippet stops working and visitors can no longer start the chat from this channel.", confirmLabel: "Archive deployment", tone: "danger" }).then((ok) => { if (ok) void deleteDeployment(selected.id).then(() => { setDeployments((items) => items.filter((item) => item.id !== selected.id)); setSelectedId(null); }); })}><Trash2 size={14} /> Archive</button>

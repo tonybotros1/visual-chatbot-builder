@@ -50,7 +50,8 @@ Open:
 - Demo builder: http://localhost:3000/bots/00000000-0000-0000-0000-000000000002/builder
 - API docs: http://localhost:8000/docs
 
-- Admin console: http://localhost:3100
+- Admin console: http://localhost:3000/admin
+- From another computer on the same network: open `http://<this machine's IP>:3000` (ports 3000 and 8000 must be allowed through the host firewall). The app points its API calls and share links at whatever address you opened it with. (gear icon on the dashboard, platform admins only)
 
 There is no built-in demo account. The platform super admin is created from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` in `.env` on startup (the password is re-applied on every start, so it can be rotated by redeploying). Builders register themselves at `/register` or are created from the admin console.
 
@@ -58,7 +59,7 @@ The backend runs every Alembic migration and, when `SEED_DEMO_DATA=true`, seeds 
 
 ## Admin console
 
-`admin/` is a separate Next.js application served from its own container on port 3100. It talks to the same API through `/api/admin/*`, which only accepts accounts with the `superadmin` role. It covers platform overview counts, builder accounts (create, disable, reset password, delete with content transfer), all bots (archive/restore, transfer owner), notification delivery retries, and the global audit log.
+The admin console lives inside the builder at `/admin` (gear icon on the dashboard for platform admins). It talks to `/api/admin/*`, which only accepts accounts with the `superadmin` role. It covers platform overview counts, builder accounts (create, disable, reset password, delete with content transfer), all bots (archive/restore, transfer owner), notification delivery retries, and the global audit log.
 
 ## Verify
 

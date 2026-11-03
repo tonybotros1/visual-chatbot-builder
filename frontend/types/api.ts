@@ -4,6 +4,13 @@ export type User = {
   id: string;
   name: string;
   email: string;
+  role?: "user" | "superadmin";
+};
+
+/** Platform-wide theme colours, editable by super admins under /settings/branding. */
+export type BrandingRecord = {
+  primary_color: string;
+  secondary_color: string;
 };
 
 export type AuthResponse = {
@@ -18,8 +25,29 @@ export type BotRecord = {
   slug: string;
   description: string;
   status: "draft" | "published" | "archived";
+  /** Dashboard workspace chosen by the owner; null means unsorted. */
+  workspace_id: string | null;
   created_at: string;
   updated_at: string;
+  owner_id?: string | null;
+  owner_name?: string;
+  /** What the signed-in account may do with this bot. */
+  access_role?: "owner" | "admin" | "editor" | "viewer";
+  /** Code behind the short share link /r/<code>. */
+  share_code?: string;
+};
+
+export type WorkspaceRecord = {
+  id: string;
+  name: string;
+  description: string;
+  position: number;
+  bot_count: number;
+  created_at: string;
+  updated_at: string;
+  owner_name?: string;
+  /** Creator and platform admins may rename or delete it. */
+  can_manage?: boolean;
 };
 
 export type ValidationIssue = {
@@ -88,8 +116,12 @@ export type ConversationState = {
     background_color?: string;
     surface_color?: string;
     text_color?: string;
+    accent_color?: string;
     avatar_url?: string;
-    layout_style?: "card" | "personal" | "modern" | "minimal" | "spotlight";
+    reply_avatar?: "profile" | "custom" | "hidden";
+    reply_avatar_url?: string;
+    layout_style?: "card" | "personal" | "modern" | "spotlight";
+    links?: Array<{ label: string; url: string }>;
   };
   settings: Partial<FlowSettings>;
   progress_percent: number;
@@ -98,6 +130,8 @@ export type ConversationState = {
 export type ConversationRecord = {
   id: string;
   session_id: string;
+  /** 1-based number of this conversation for the bot, oldest first. */
+  response_number: number;
   status: string;
   current_node_id: string | null;
   variables: Record<string, unknown>;
@@ -109,6 +143,10 @@ export type ConversationRecord = {
     variable_name: string;
     value: unknown;
     created_at: string;
+    /** The question the visitor saw, as plain text. */
+    question?: string;
+    /** The answer as the visitor saw it (option labels), when it differs from the stored value. */
+    answer_text?: string;
   }>;
   trace: Array<Record<string, unknown>>;
   source: string;
@@ -224,6 +262,7 @@ export type DeploymentBootstrap = {
   version_number: number | null;
   start_endpoint: string | null;
   eligibility_token: string | null;
+  widget: Record<string, unknown>;
 };
 
 export type CustomDomain = {

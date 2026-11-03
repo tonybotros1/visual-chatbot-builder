@@ -19,7 +19,9 @@ export default function LoginPage() {
     setError("");
     try {
       await login(email, password);
-      router.push("/dashboard");
+      // Come back to the page that asked for a sign-in (same-site paths only).
+      const next = new URLSearchParams(window.location.search).get("next") ?? "";
+      router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Login failed");
     } finally {

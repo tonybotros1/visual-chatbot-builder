@@ -3,12 +3,12 @@ import type { BotRecord, ValidationReport } from "@/types/api";
 
 export const listBots = () => apiFetch<BotRecord[]>("/bots");
 export const getBot = (botId: string) => apiFetch<BotRecord>(`/bots/${botId}`);
-export const createBot = (name: string, description = "") =>
+export const createBot = (name: string, description = "", workspaceId: string | null = null) =>
   apiFetch<BotRecord>("/bots", {
     method: "POST",
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, workspace_id: workspaceId }),
   });
-export const updateBot = (botId: string, updates: Partial<Pick<BotRecord, "name" | "description" | "status" | "slug">>) =>
+export const updateBot = (botId: string, updates: Partial<Pick<BotRecord, "name" | "description" | "status" | "slug" | "workspace_id">>) =>
   apiFetch<BotRecord>(`/bots/${botId}`, {
     method: "PUT",
     body: JSON.stringify(updates),

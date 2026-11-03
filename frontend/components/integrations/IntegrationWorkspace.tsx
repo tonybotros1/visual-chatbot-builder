@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/Select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -29,7 +30,7 @@ const kinds: Array<{ value: IntegrationConnection["kind"]; label: string }> = [
 function starterConfig(kind: IntegrationConnection["kind"]) {
   if (kind === "email") return { host: "smtp.example.com", port: 587, from_email: "bot@example.com", to_email: "team@example.com", starttls: true };
   if (["webhook", "slack", "sms"].includes(kind)) return { url: "https://example.com/webhook", ...(kind === "sms" ? { message_template: "Your verification code is {code}", sender: "" } : {}) };
-  if (kind === "storage") return { provider: "s3", bucket: "", region: "us-east-1", endpoint: "https://s3.us-east-1.amazonaws.com", path_style: true };
+  if (kind === "storage") return { provider: "azure", account: "", container: "spaghetti-uploads", endpoint_suffix: "core.windows.net" };
   if (kind === "stripe") return { success_url: "https://example.com/payment/success", cancel_url: "https://example.com/payment/cancel", product_name: "Chatbot payment" };
   if (kind === "paypal") return { environment: "sandbox", return_url: "https://example.com/payment/success", cancel_url: "https://example.com/payment/cancel" };
   if (["google_calendar", "microsoft_calendar"].includes(kind)) return { calendar_id: "primary", event_title: "Chatbot appointment" };
@@ -39,7 +40,7 @@ function starterConfig(kind: IntegrationConnection["kind"]) {
 function starterSecrets(kind: IntegrationConnection["kind"]) {
   if (kind === "stripe") return { secret_key: "" };
   if (kind === "paypal") return { client_id: "", client_secret: "" };
-  if (kind === "storage") return { access_key_id: "", secret_access_key: "", session_token: "" };
+  if (kind === "storage") return { account_key: "" };
   if (["google_calendar", "microsoft_calendar"].includes(kind)) return { access_token: "" };
   if (kind === "email") return { username: "", password: "" };
   if (kind === "sms") return { token: "" };
@@ -96,7 +97,7 @@ export function IntegrationWorkspace({ botId }: { botId: string }) {
       <div className="integration-grid">
         <form className="integration-card" onSubmit={addConnection}>
           <div><p className="eyebrow">Encrypted credential vault</p><h2>New connection</h2></div>
-          <label>Provider<select value={kind} onChange={(event) => { const next = event.target.value as IntegrationConnection["kind"]; setKind(next); setConfigText(JSON.stringify(starterConfig(next), null, 2)); setSecretsText(JSON.stringify(starterSecrets(next), null, 2)); }}>{kinds.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          <label>Provider<Select ariaLabel="Provider" value={kind} options={kinds.map((item) => ({ value: item.value, label: item.label }))} onChange={(value) => { const next = value as IntegrationConnection["kind"]; setKind(next); setConfigText(JSON.stringify(starterConfig(next), null, 2)); setSecretsText(JSON.stringify(starterSecrets(next), null, 2)); }} /></label>
           <label>Name<input required value={name} onChange={(event) => setName(event.target.value)} /></label>
           <label>Non-secret configuration<textarea spellCheck={false} value={configText} onChange={(event) => setConfigText(event.target.value)} /></label>
           <label><span><KeyRound size={13} /> Secret values</span><textarea spellCheck={false} value={secretsText} onChange={(event) => setSecretsText(event.target.value)} /></label>
@@ -105,7 +106,7 @@ export function IntegrationWorkspace({ botId }: { botId: string }) {
         <section className="integration-card">
           <div><p className="eyebrow">Available providers</p><h2>Connections</h2></div>
           <div className="connection-list">{connections.length ? connections.map((item) => <article key={item.id}><div><Link2 size={15} /><span><strong>{item.name}</strong><small>{item.kind} · {item.has_secrets ? "credentials stored" : "no credentials"}</small></span></div><span className="status-pill">{item.status}</span><button type="button" aria-label={`Disable ${item.name}`} onClick={() => void disableIntegration(item.id).then(() => setConnections((items) => items.map((value) => value.id === item.id ? { ...value, status: "disabled" } : value)))}><Trash2 size={14} /></button></article>) : <p className="contract-empty">No provider connections yet.</p>}</div>
-          <form className="subscription-form" onSubmit={addSubscription}><div><p className="eyebrow">Bot notifications</p><h3>Subscribe a channel</h3></div><select value={selectedConnection} onChange={(event) => setSelectedConnection(event.target.value)} required><option value="">Choose connection</option>{connections.filter((item) => item.status === "active" && ["webhook", "email", "slack", "sms"].includes(item.kind)).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select><select value={eventName} onChange={(event) => setEventName(event.target.value as EventSubscription["event"])}><option value="conversation.started">Conversation started</option><option value="conversation.completed">Conversation completed</option><option value="response.qualified">Response qualified</option></select><button className="secondary-button" type="submit"><BellRing size={14} /> Subscribe</button></form>
+          <form className="subscription-form" onSubmit={addSubscription}><div><p className="eyebrow">Bot notifications</p><h3>Subscribe a channel</h3></div><Select ariaLabel="Connection" value={selectedConnection} options={[{ value: "", label: "Choose connection" }, ...connections.filter((item) => item.status === "active" && ["webhook", "email", "slack", "sms"].includes(item.kind)).map((item) => ({ value: item.id, label: item.name }))]} onChange={setSelectedConnection} /><Select ariaLabel="Event" value={eventName} options={[{ value: "conversation.started", label: "Conversation started" }, { value: "conversation.completed", label: "Conversation completed" }, { value: "response.qualified", label: "Response qualified" }]} onChange={(value) => setEventName(value as EventSubscription["event"])} /><button className="secondary-button" type="submit"><BellRing size={14} /> Subscribe</button></form>
           <div className="subscription-list">{subscriptions.map((item) => <span key={item.id}>{connectionById[item.connection_id]?.name ?? item.connection_id} · {item.event}<button type="button" onClick={() => void deleteSubscription(item.id).then(() => setSubscriptions((items) => items.filter((value) => value.id !== item.id)))}><Trash2 size={12} /></button></span>)}</div>
         </section>
         <section className="integration-card delivery-card">

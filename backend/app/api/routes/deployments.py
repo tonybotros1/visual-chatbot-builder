@@ -44,6 +44,96 @@ router = APIRouter()
 public_router = APIRouter()
 
 
+WIDGET_POSITIONS = ("left", "center", "right")
+
+
+def _widget_config(flow: dict[str, Any], bot_name: str) -> dict[str, Any]:
+    """Launcher settings for the website widget, taken from the Design tab of the published flow."""
+    appearance = flow.get("appearance") or {}
+    nodes = [node for node in flow.get("nodes") or [] if isinstance(node, dict)]
+    by_id = {node.get("id"): node for node in nodes}
+    start = next((node for node in nodes if node.get("type") == "start"), None)
+    welcome_text = None
+    if start is not None:
+        for edge in flow.get("edges") or []:
+            if not isinstance(edge, dict) or edge.get("source") != start.get("id"):
+                continue
+            raw = str(((by_id.get(edge.get("target")) or {}).get("data") or {}).get("label") or "")
+            label = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)).strip()
+            if label:
+                welcome_text = label if len(label) <= 240 else label[:237].rstrip() + "..."
+                break
+    reply_mode = appearance.get("reply_avatar") or "profile"
+    avatar = appearance.get("reply_avatar_url") if reply_mode == "custom" and appearance.get("reply_avatar_url") else appearance.get("avatar_url")
+    position = appearance.get("widget_position")
+    return {
+        "position": position if position in WIDGET_POSITIONS else "right",
+        "welcome": appearance.get("widget_welcome", True) is not False,
+        "welcome_text": welcome_text,
+        "avatar_url": avatar or None,
+        "primary_color": appearance.get("primary_color") or None,
+        "title": appearance.get("title") or bot_name,
+    }
+
+
+# Shared by the SDK and the per-deployment embed script: a round avatar launcher at the chosen
+# position, an optional welcome bubble with the first question, and the panel aligned to the same side.
+WIDGET_LAUNCHER_JS = """function mountLauncher(widget, config, panel, onToggle) {
+    const position = widget.position || 'right';
+    const centered = position === 'center';
+    const side = position === 'left' ? 'left:24px;right:auto' : centered ? 'left:50%;right:auto;transform:translateX(-50%)' : 'right:24px';
+    panel.style.cssText += ';' + side + (centered ? ';width:min(520px,calc(100vw - 32px))' : '');
+    const color = config.primary_color || widget.primary_color || '#6d5dfc';
+    const label = config.launcher_label || widget.title || 'Chat';
+    const icon = '<svg width="SIZE" height="SIZE" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 3 11.5a8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 9 8.4z"/></svg>';
+    const face = (size, iconSize) => {
+      const node = document.createElement('span');
+      node.style.cssText = 'position:relative;display:grid;place-items:center;flex:0 0 auto;width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;color:#fff;background:' + color;
+      if (widget.avatar_url) {
+        const image = document.createElement('img'); image.src = widget.avatar_url; image.alt = '';
+        image.style.cssText = 'width:100%;height:100%;object-fit:cover'; node.appendChild(image);
+      } else {
+        node.innerHTML = icon.replace(/SIZE/g, String(iconSize));
+      }
+      return node;
+    };
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-label', label);
+    if (centered) {
+      // Centre mode: a long bar that reads like the chat's own composer, with the panel opening above it.
+      button.style.cssText = 'position:fixed;bottom:24px;' + side + ';z-index:2147483647;display:flex;align-items:center;gap:12px;width:min(520px,calc(100vw - 32px));height:54px;padding:0 8px 0 10px;border:0;border-radius:999px;color:#6b7280;background:#fff;font:500 15px system-ui;text-align:left;box-shadow:0 12px 32px rgba(0,0,0,.18);cursor:pointer';
+      const text = document.createElement('span'); text.textContent = config.launcher_label || 'Tap an option';
+      text.style.cssText = 'flex:1 1 auto;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
+      const send = document.createElement('span');
+      send.style.cssText = 'display:grid;place-items:center;flex:0 0 auto;width:38px;height:38px;border-radius:50%;color:#fff;background:' + color;
+      send.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
+      button.append(face(36, 18), text, send);
+    } else {
+      button.style.cssText = 'position:fixed;bottom:24px;' + side + ';z-index:2147483647;display:grid;place-items:center;width:60px;height:60px;padding:0;border:0;border-radius:50%;color:#fff;background:' + color + ';box-shadow:0 12px 32px rgba(0,0,0,.22);cursor:pointer';
+      if (widget.avatar_url) {
+        const image = document.createElement('img'); image.src = widget.avatar_url; image.alt = '';
+        image.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover'; button.appendChild(image);
+      } else {
+        button.innerHTML = icon.replace(/SIZE/g, '26');
+      }
+      const dot = document.createElement('span');
+      dot.style.cssText = 'position:absolute;right:2px;bottom:2px;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#22c55e';
+      button.appendChild(dot);
+    }
+    let teaser = null;
+    if (widget.welcome && widget.welcome_text) {
+      teaser = document.createElement('button'); teaser.type = 'button'; teaser.textContent = widget.welcome_text;
+      teaser.style.cssText = 'position:fixed;bottom:96px;' + side + ';z-index:2147483647;max-width:min(300px,calc(100vw - 48px));padding:12px 14px;border:0;border-radius:14px;color:#1f2933;background:#fff;font:500 14px/1.4 system-ui;text-align:left;box-shadow:0 12px 32px rgba(0,0,0,.18);cursor:pointer';
+      teaser.addEventListener('click', () => { teaser.remove(); teaser = null; onToggle(true); });
+    }
+    button.addEventListener('click', () => { if (teaser) { teaser.remove(); teaser = null; } onToggle(); });
+    document.body.appendChild(button);
+    if (teaser) document.body.appendChild(teaser);
+    return { button, remove() { button.remove(); if (teaser) teaser.remove(); } };
+  }"""
+
+
 @public_router.get("/sdk/v1.js")
 def javascript_sdk(request: Request) -> Response:
     api_base = str(request.base_url).rstrip("/")
@@ -52,6 +142,7 @@ def javascript_sdk(request: Request) -> Response:
   const instances = new Map();
   const apiBase = {json.dumps(api_base)};
   function css(node, value) {{ node.style.cssText = value; return node; }}
+  {WIDGET_LAUNCHER_JS}
   async function init(options) {{
     if (!options || !options.deploymentKey) throw new Error('deploymentKey is required');
     const key = options.deploymentKey;
@@ -69,14 +160,11 @@ def javascript_sdk(request: Request) -> Response:
     iframe.title = config.title || config.launcher_label || 'Chat';
     iframe.allow = 'payment; clipboard-write';
     const panel = css(document.createElement('div'), data.mode === 'embed' ? 'width:100%;height:620px;max-width:520px' : 'display:none;position:fixed;right:24px;bottom:88px;width:min(390px,calc(100vw - 32px));height:min(620px,calc(100vh - 120px));z-index:2147483646;border-radius:18px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.28)');
+    if (data.mode !== 'embed') panel.style.bottom = '96px';
     panel.appendChild(iframe);
     const mount = config.target ? document.querySelector(config.target) : null;
     (mount || document.body).appendChild(panel);
-    let button = null;
-    if (data.mode !== 'embed') {{
-      button = css(document.createElement('button'), `position:fixed;right:24px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;padding:14px 20px;color:#fff;font:600 15px system-ui;background:${{config.primary_color || '#6d5dfc'}};box-shadow:0 12px 32px rgba(0,0,0,.22);cursor:pointer`);
-      button.type='button'; button.textContent=config.launcher_label || 'Chat'; button.addEventListener('click', () => api.toggle()); document.body.appendChild(button);
-    }}
+    const launcher = data.mode !== 'embed' ? mountLauncher(data.widget || {{}}, config, panel, open => open === true ? api.open() : api.toggle()) : null;
     const listeners = new Map();
     const onMessage = event => {{ if (event.source !== iframe.contentWindow || event.data?.type !== 'visual-chatbot:event') return; (listeners.get(event.data.event) || []).forEach(callback => callback(event.data.payload)); }};
     window.addEventListener('message', onMessage);
@@ -86,7 +174,7 @@ def javascript_sdk(request: Request) -> Response:
       close(){{ if(data.mode !== 'embed') panel.style.display='none'; }},
       toggle(){{ panel.style.display === 'none' ? api.open() : api.close(); }},
       on(event, callback){{ const values=listeners.get(event)||[]; values.push(callback); listeners.set(event,values); return () => listeners.set(event,(listeners.get(event)||[]).filter(item=>item!==callback)); }},
-      destroy(){{ window.removeEventListener('message',onMessage); panel.remove(); button?.remove(); instances.delete(key); }},
+      destroy(){{ window.removeEventListener('message',onMessage); panel.remove(); launcher?.remove(); instances.delete(key); }},
       iframe,
     }};
     instances.set(key, {{api}}); if(config.open) api.open(); return api;
@@ -434,6 +522,7 @@ def bootstrap(
         deployment_key=deployment.deployment_key,
         mode=deployment.mode,
         config=deployment.config,
+        widget=_widget_config(version.flow_json, bot.name),
         bot_slug=bot.slug if eligible else None,
         version_number=version.version_number if eligible else None,
         start_endpoint=endpoint,
@@ -488,16 +577,18 @@ def deployment_start(
 
 @public_router.get("/deployments/{deployment_key}/embed.js")
 def embed_script(deployment_key: str, request: Request, db: Annotated[Session, Depends(get_db)]) -> Response:
-    deployment, bot, _ = _public_deployment(deployment_key, db)
+    deployment, bot, version = _public_deployment(deployment_key, db)
     frontend_base = str(deployment.config.get("frontend_url") or "http://localhost:3000").rstrip("/")
     chat_url = f"{frontend_base}/chat/{bot.slug}?deployment={deployment.deployment_key}"
     api_base = str(request.base_url).rstrip("/")
-    color = str(deployment.config.get("primary_color") or "#6d5dfc")
     title = str(deployment.config.get("launcher_label") or "Chat")
     mode = deployment.mode
+    widget = _widget_config(version.flow_json, bot.name)
+    launcher_config = {"primary_color": deployment.config.get("primary_color"), "launcher_label": deployment.config.get("launcher_label")}
     script = f"""(() => {{
   const current = document.currentScript;
   const key = {json.dumps(deployment.deployment_key)};
+  {WIDGET_LAUNCHER_JS}
   const query = new URLSearchParams({{url: location.href, referrer: document.referrer, language: navigator.language}});
   fetch({json.dumps(api_base + '/api/public/deployments/' + deployment.deployment_key + '/bootstrap')} + '?' + query)
     .then(response => response.ok ? response.json() : Promise.reject(new Error('bootstrap failed')))
@@ -511,10 +602,9 @@ def embed_script(deployment_key: str, request: Request, db: Annotated[Session, D
         const mount = document.querySelector(current?.dataset.target || '') || current?.parentElement;
         const frame = document.createElement('div'); frame.style.cssText='width:100%;height:620px;max-width:520px'; frame.appendChild(iframe); mount?.appendChild(frame); return;
       }}
-      const panel = document.createElement('div'); panel.style.cssText='display:none;position:fixed;right:24px;bottom:88px;width:min(390px,calc(100vw - 32px));height:min(620px,calc(100vh - 120px));z-index:2147483646;border-radius:18px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.28)'; panel.appendChild(iframe);
-      const button = document.createElement('button'); button.type='button'; button.textContent={json.dumps(title)}; button.setAttribute('aria-label', {json.dumps(title)}); button.style.cssText='position:fixed;right:24px;bottom:24px;z-index:2147483647;border:0;border-radius:999px;padding:14px 20px;color:#fff;font:600 15px system-ui;background:{color};box-shadow:0 12px 32px rgba(0,0,0,.22);cursor:pointer';
-      button.addEventListener('click', () => {{ panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; }});
-      document.body.append(panel, button);
+      const panel = document.createElement('div'); panel.style.cssText='display:none;position:fixed;right:24px;bottom:96px;width:min(390px,calc(100vw - 32px));height:min(620px,calc(100vh - 120px));z-index:2147483646;border-radius:18px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.28)'; panel.appendChild(iframe);
+      document.body.appendChild(panel);
+      mountLauncher({json.dumps(widget)}, {json.dumps(launcher_config)}, panel, open => {{ panel.style.display = open === true || panel.style.display === 'none' ? 'block' : 'none'; }});
     }}).catch(() => undefined);
 }})();"""
     return Response(content=script, media_type="application/javascript", headers={"Cache-Control": "no-cache"})

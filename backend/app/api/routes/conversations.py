@@ -1,10 +1,11 @@
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -12,6 +13,7 @@ from app.api.routes.bots import owned_bot
 from app.database.session import get_db
 from app.engine.executor import EngineError
 from app.models.bot import Bot, BotVersion
+from app.models.subflow import SubflowVersion
 from app.models.conversation import Conversation, ConversationAnswer
 from app.models.provider import StoredFile
 from app.models.user import User
@@ -232,6 +234,67 @@ def _start(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _plain(text: object) -> str:
+    cleaned = _TAG_RE.sub(" ", str(text or ""))
+    cleaned = cleaned.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return " ".join(cleaned.split())[:300]
+
+
+def _question_lookup(db: Session, conversation: Conversation) -> dict[str, dict]:
+    """Node id → {question, choices} for the version this conversation ran on, including nodes of referenced components.
+    `choices` maps stored option values to the labels the visitor clicked."""
+    version = db.get(BotVersion, conversation.bot_version_id) if conversation.bot_version_id else None
+    if version is None:
+        return {}
+    lookup: dict[str, dict] = {}
+    flows: list[dict] = [version.flow_json or {}]
+    seen_subflows: set[str] = set()
+    while flows:
+        flow = flows.pop()
+        for node in flow.get("nodes", []):
+            data = node.get("data", {}) or {}
+            label = _plain(data.get("label") or data.get("title") or data.get("question") or "")
+            options = data.get("options") or []
+            values = data.get("option_values") or []
+            choices = {str(value): _plain(text) for value, text in zip(values, options)} if values and len(values) == len(options) else {}
+            if node.get("id") and (label or choices):
+                lookup[str(node["id"])] = {"question": label, "choices": choices}
+            subflow_version_id = data.get("subflow_version_id")
+            if node.get("type") == "subflow" and subflow_version_id and subflow_version_id not in seen_subflows:
+                seen_subflows.add(subflow_version_id)
+                try:
+                    sub_version = db.get(SubflowVersion, UUID(str(subflow_version_id)))
+                except ValueError:
+                    sub_version = None
+                if sub_version is not None:
+                    flows.append(sub_version.flow_json or {})
+    return lookup
+
+
+def _answer_text(value: object, choices: dict[str, str]) -> str:
+    """Option values back to the labels the visitor saw; empty when there is nothing to translate."""
+    if not choices:
+        return ""
+    if isinstance(value, list):
+        return ", ".join(choices.get(str(item), str(item)) for item in value)
+    return choices.get(str(value), "")
+
+
+def _response_number(db: Session, conversation: Conversation) -> int:
+    return int(
+        db.scalar(
+            select(func.count(Conversation.id)).where(
+                Conversation.bot_id == conversation.bot_id,
+                Conversation.started_at <= conversation.started_at,
+            )
+        )
+        or 0
+    )
+
+
 def _conversation_read(db: Session, conversation: Conversation) -> ConversationRead:
     answers = list(
         db.scalars(
@@ -240,15 +303,24 @@ def _conversation_read(db: Session, conversation: Conversation) -> ConversationR
             .order_by(ConversationAnswer.created_at)
         )
     )
+    questions = _question_lookup(db, conversation)
     return ConversationRead(
         id=conversation.id,
         session_id=conversation.session_id,
+        response_number=_response_number(db, conversation),
         status=conversation.status,
         current_node_id=conversation.current_node_id,
         variables=conversation.variables or {},
         started_at=conversation.started_at,
         completed_at=conversation.completed_at,
-        answers=[AnswerRead.model_validate(item) for item in answers],
+        answers=[
+            AnswerRead(
+                id=item.id, node_id=item.node_id, variable_name=item.variable_name, value=item.value, created_at=item.created_at,
+                question=questions.get(item.node_id, {}).get("question", ""),
+                answer_text=_answer_text(item.value, questions.get(item.node_id, {}).get("choices", {})),
+            )
+            for item in answers
+        ],
         trace=(conversation.runtime_state or {}).get("trace", []),
         source=conversation.source,
         metadata=conversation.context_data or {},

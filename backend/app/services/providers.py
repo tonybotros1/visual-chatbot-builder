@@ -22,6 +22,7 @@ from urllib.request import Request, urlopen
 
 from app.config import get_settings
 from app.engine.executor import EngineError, validate_answer
+from app.services.azure_blob import AzureBlobClient, config_from_connection, platform_client
 from app.models.bot import BotVersion
 from app.models.conversation import Conversation
 from app.models.integration import IntegrationConnection
@@ -113,16 +114,39 @@ def safe_filename(value: str) -> str:
     return cleaned[:180] or "upload.bin"
 
 
-def store_file_content(db: Session, payload: dict[str, Any], storage_key: str, content: bytes) -> tuple[str, UUID | None]:
+def _azure_client_for(connection: IntegrationConnection) -> AzureBlobClient:
+    return AzureBlobClient(config_from_connection(connection.config or {}, decrypt_secrets(connection.encrypted_secrets)))
+
+
+def _storage_connection(db: Session, connection_id: UUID | None) -> IntegrationConnection:
+    connection = db.get(IntegrationConnection, connection_id) if connection_id else None
+    if connection is None or connection.kind != "storage" or connection.status != "active":
+        raise EngineError("Object storage connection is unavailable")
+    return connection
+
+
+def store_file_content(db: Session, payload: dict[str, Any], storage_key: str, content: bytes, content_type: str = "application/octet-stream") -> tuple[str, UUID | None]:
+    """Write the bytes and report (storage_provider, connection_id) for the StoredFile row.
+
+    "local" in the node means the platform default: Azure Blob Storage when AZURE_STORAGE_* is set,
+    the server disk otherwise. "object" uses the bot's own storage connection (Azure or S3).
+    """
     provider = str(payload.get("storage_provider") or "local")
     if provider == "local":
+        azure = platform_client()
+        if azure is not None:
+            azure.upload(storage_key, content, content_type)
+            return "azure", None
         path = storage_path(storage_key); path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(content)
         return provider, None
     try: connection_id = UUID(str(payload.get("provider_connection_id")))
     except ValueError as exc: raise EngineError("Object storage connection is missing") from exc
-    connection = db.get(IntegrationConnection, connection_id)
-    if connection is None or connection.kind != "storage" or connection.status != "active": raise EngineError("Object storage connection is unavailable")
-    if connection.config.get("provider", "s3") != "s3": raise EngineError("Only S3-compatible object storage is supported")
+    connection = _storage_connection(db, connection_id)
+    kind = str((connection.config or {}).get("provider", "s3"))
+    if kind == "azure":
+        _azure_client_for(connection).upload(storage_key, content, content_type)
+        return "azure", connection.id
+    if kind != "s3": raise EngineError("Object storage provider must be azure or s3")
     _s3_request("PUT", storage_key, connection, content)
     return "s3", connection.id
 
@@ -132,16 +156,26 @@ def read_file_content(db: Session, item: StoredFile) -> bytes:
         path = storage_path(item.storage_key)
         if not path.is_file(): raise EngineError("Stored file is unavailable")
         return path.read_bytes()
-    connection = db.get(IntegrationConnection, item.connection_id) if item.connection_id else None
-    if connection is None or connection.status != "active": raise EngineError("Object storage connection is unavailable")
+    if item.storage_provider == "azure" and item.connection_id is None:
+        azure = platform_client()
+        if azure is None: raise EngineError("Azure storage is no longer configured on this server")
+        return azure.download(item.storage_key)
+    connection = _storage_connection(db, item.connection_id)
+    if item.storage_provider == "azure": return _azure_client_for(connection).download(item.storage_key)
     return _s3_request("GET", item.storage_key, connection)
 
 
 def delete_file_content(db: Session, item: StoredFile) -> None:
     if item.storage_provider == "local":
         storage_path(item.storage_key).unlink(missing_ok=True); return
+    if item.storage_provider == "azure" and item.connection_id is None:
+        azure = platform_client()
+        if azure is not None: azure.delete(item.storage_key)
+        return
     connection = db.get(IntegrationConnection, item.connection_id) if item.connection_id else None
-    if connection and connection.status == "active": _s3_request("DELETE", item.storage_key, connection)
+    if connection is None or connection.status != "active": return
+    if item.storage_provider == "azure": _azure_client_for(connection).delete(item.storage_key)
+    else: _s3_request("DELETE", item.storage_key, connection)
 
 
 def _s3_request(method: str, key: str, connection: IntegrationConnection, body: bytes = b"") -> bytes:

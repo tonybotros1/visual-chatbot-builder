@@ -213,7 +213,10 @@ def main() -> None:
         collaborator = request(f"/bots/{bot_id}/collaborators", method="POST", payload={"email": member_email, "role": "viewer"}, token=token)
         request(f"/bots/{bot_id}", token=member["access_token"])
         # A viewer can see the bot, so a forbidden edit is a 403 (not a 404 that would hide its existence).
-        request(f"/bots/{bot_id}/flow", method="PUT", payload=flow, token=member["access_token"], expected_status=403)
+        # Under the platform-wide "Everyone can edit" sharing mode every user is an editor, so the same
+        # request succeeds; only the private mode (the default on a fresh stack, as in CI) forbids it.
+        sharing = request("/platform/access", token=token)["bot_sharing"]
+        request(f"/bots/{bot_id}/flow", method="PUT", payload=flow, token=member["access_token"], expected_status=200 if sharing == "edit" else 403)
         audit = request(f"/bots/{bot_id}/audit-log", token=token)
         assert any(item["action"] == "collaborator.upserted" for item in audit)
         request(f"/bots/{bot_id}/collaborators/{collaborator['id']}", method="DELETE", token=token, expected_status=204)

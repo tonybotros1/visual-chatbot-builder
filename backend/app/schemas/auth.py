@@ -20,6 +20,7 @@ class UserRead(BaseModel):
     email: EmailStr
     role: str = "user"
     is_active: bool = True
+    is_owner: bool = False
 
     model_config = {"from_attributes": True}
 

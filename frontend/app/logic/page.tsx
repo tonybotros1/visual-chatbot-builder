@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/Select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -55,7 +56,7 @@ export default function LogicLibraryPage() {
         <form className="create-bot-card" onSubmit={create}>
           <button className="close-button" type="button" aria-label="Close" onClick={() => setShowCreate(false)}><X size={17} /></button>
           <h2>Create reusable logic</h2>
-          <label>Type<select value={kind} onChange={(event) => setKind(event.target.value as LogicKind)}><option value="rule_set">Rule set</option><option value="decision_table">Decision table</option></select></label>
+          <label>Type<Select ariaLabel="Type" value={kind} options={[{ value: "rule_set", label: "Rule set" }, { value: "decision_table", label: "Decision table" }]} onChange={(value) => setKind(value as LogicKind)} /></label>
           <label>Name<input required minLength={2} value={name} onChange={(event) => setName(event.target.value)} /></label>
           <label>Description<textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
           {error ? <p className="form-error">{error}</p> : null}

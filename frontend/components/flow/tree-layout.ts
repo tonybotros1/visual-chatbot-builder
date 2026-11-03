@@ -9,6 +9,8 @@ export type TreeLayout = {
   treeEdgeIds: Set<string>;
   /** Number of children each node has in the tree (0 for leaves). */
   childCount: Map<string, number>;
+  /** Nodes not reachable from Start. They (and their subtrees) keep their saved position and drag normally. */
+  detached: Set<string>;
 };
 
 const DEFAULT_WIDTH = 260;
@@ -135,14 +137,29 @@ export function buildTreeLayout(nodes: BuilderNode[], edges: BuilderEdge[], coll
       cursor += (subtreeWidth.get(child) ?? 0) + COLUMN_GAP;
     }
   };
-  let cursor = 0;
-  for (const root of roots) {
+  const detached = new Set<string>();
+  const subtreeIds = (id: string, into: string[] = []) => {
+    into.push(id);
+    for (const child of children.get(id) ?? []) subtreeIds(child, into);
+    return into;
+  };
+  roots.forEach((root, index) => {
     measure(root);
-    place(root, cursor);
-    cursor += (subtreeWidth.get(root) ?? 0) + COLUMN_GAP * 3;
-  }
+    place(root, 0);
+    if (index === 0 && start && root === start.id) return;
+    // Detached roots (new or unconnected nodes) stay where the user put them, subtree and all.
+    const anchor = byId.get(root)?.position ?? { x: 0, y: 0 };
+    const placed = positions.get(root) ?? { x: 0, y: 0 };
+    const dx = anchor.x - placed.x;
+    const dy = anchor.y - placed.y;
+    for (const id of subtreeIds(root)) {
+      detached.add(id);
+      const current = positions.get(id);
+      if (current) positions.set(id, { x: current.x + dx, y: current.y + dy });
+    }
+  });
 
   const childCount = new Map<string, number>();
   for (const [id, kids] of children) childCount.set(id, kids.length);
-  return { positions, hidden, treeEdgeIds, childCount };
+  return { positions, hidden, treeEdgeIds, childCount, detached };
 }

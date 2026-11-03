@@ -53,7 +53,7 @@ async def upload_file(token: str, request: Request, db: Annotated[Session, Depen
     storage_key = f"{payload['conversation_id']}/{uuid4().hex}-{safe_filename(str(payload['name']))}"
     storage_provider, connection_id = "local", None
     if scan_status == "clean":
-        try: storage_provider, connection_id = store_file_content(db, payload, storage_key, content)
+        try: storage_provider, connection_id = store_file_content(db, payload, storage_key, content, str(payload.get("type") or "application/octet-stream"))
         except EngineError as exc: raise _engine_error(exc) from exc
     item = StoredFile(
         conversation_id=UUID(str(payload["conversation_id"])), node_id=str(payload["node_id"]),

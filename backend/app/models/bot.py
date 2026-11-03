@@ -17,8 +17,14 @@ class Bot(Base):
     user_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    # Dashboard folder chosen by the owner; NULL means unsorted. Deleting the workspace clears it.
+    workspace_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(160))
     slug: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    # Short, stable code behind /r/<code> share links; assigned the first time the bot is read.
+    share_code: Mapped[str | None] = mapped_column(String(16), unique=True, index=True, nullable=True)
     description: Mapped[str] = mapped_column(String(1000), default="")
     status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
     created_at: Mapped[datetime] = mapped_column(

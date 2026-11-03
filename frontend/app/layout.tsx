@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
 import { DialogHost } from "@/components/ui/DialogHost";
+import { BrandingProvider } from "@/components/brand/BrandingProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en">
       <body>
+        <BrandingProvider />
         {children}
         <DialogHost />
       </body>

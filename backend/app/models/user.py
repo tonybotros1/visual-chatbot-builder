@@ -5,6 +5,7 @@ from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.config import get_settings
 from app.database.base import Base
 
 
@@ -22,3 +23,9 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    @property
+    def is_owner(self) -> bool:
+        """The account named by SUPER_ADMIN_EMAIL: seeded as super admin on every start and protected from
+        role, access and deletion changes by other admins."""
+        email = get_settings().super_admin_email.strip().lower()
+        return bool(email) and self.email.lower() == email

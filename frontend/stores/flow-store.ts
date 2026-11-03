@@ -1,3 +1,4 @@
+import { randomId } from "@/services/ids";
 import {
   addEdge,
   applyEdgeChanges,
@@ -24,6 +25,14 @@ export const CANVAS_VIEW_KEY = "spaghetti:canvas-view";
 export type CanvasLayoutMode = "flow" | "tree";
 export const CANVAS_LAYOUT_KEY = "spaghetti:canvas-layout";
 
+/** Darken a #RRGGBB colour by the given fraction (0.3 = 30% towards black). */
+export function darkenHex(hex: string, amount: number): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return hex;
+  const channels = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16));
+  return `#${channels.map((value) => Math.round(value * (1 - amount)).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+}
+
 export const defaultFlowAppearance: FlowAppearance = {
   title: "Spaghetti chatbot",
   description: "",
@@ -31,8 +40,14 @@ export const defaultFlowAppearance: FlowAppearance = {
   background_color: "#FFFFFF",
   surface_color: "#FFFFFF",
   text_color: "#211D29",
+  accent_color: "#5B21B6",
   avatar_url: "",
+  reply_avatar: "profile",
+  reply_avatar_url: "",
   layout_style: "card",
+  widget_position: "right",
+  widget_welcome: true,
+  links: [],
 };
 
 export const defaultFlowSettings: FlowSettings = {
@@ -477,6 +492,10 @@ type FlowState = {
   layoutMode: CanvasLayoutMode;
   /** Tree-mode branches folded by the user (node ids). */
   collapsedNodeIds: string[];
+  /** Tree-mode: how far the user dragged a node away from its computed slot. Not saved; Auto arrange clears it. */
+  treeOffsets: Record<string, XYPosition>;
+  /** True from mount (or clearGraph) until a flow is set, so the canvas shows a loading state instead of stale nodes. */
+  graphLoading: boolean;
   isDirty: boolean;
   onNodesChange: (changes: NodeChange<BuilderNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<BuilderEdge>[]) => void;
@@ -496,7 +515,13 @@ type FlowState = {
   setViewMode: (mode: CanvasViewMode) => void;
   setLayoutMode: (mode: CanvasLayoutMode) => void;
   toggleCollapsed: (nodeId: string) => void;
+  nudgeTreeNode: (nodeId: string, offset: XYPosition) => void;
+  resetTreeNudges: () => void;
   formatLayout: () => void;
+  /** Empty the canvas before loading another bot so its nodes never flash in. */
+  clearGraph: () => void;
+  /** Leave the loading state without a flow (load failed and nothing local to show). */
+  markGraphReady: () => void;
   setGraph: (document: FlowDocument) => void;
   getDocument: () => FlowDocument;
   markSaved: () => void;
@@ -517,19 +542,10 @@ function cloneNodeData(data: BuilderNodeData): BuilderNodeData {
   };
 }
 
-function cloneInitialNodes() {
-  return normalizeNodeNumbers(
-    initialNodes.map((node) => ({ ...node, data: cloneNodeData(node.data) })),
-  );
-}
-
-function cloneInitialEdges() {
-  return initialEdges.map((edge) => ({ ...edge, ...edgeDefaults }));
-}
-
+// The store starts empty: a bot's own flow replaces it on load, so no placeholder graph ever shows.
 export const useFlowStore = create<FlowState>((set, get) => ({
-  nodes: cloneInitialNodes(),
-  edges: cloneInitialEdges(),
+  nodes: [],
+  edges: [],
   appearance: { ...defaultFlowAppearance },
   settings: { ...defaultFlowSettings },
   selectedNodeId: null,
@@ -538,6 +554,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   viewMode: "detailed",
   layoutMode: "flow",
   collapsedNodeIds: [],
+  treeOffsets: {},
+  graphLoading: true,
   isDirty: false,
 
   onNodesChange: (changes) =>
@@ -604,7 +622,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   addNode: (type, position) =>
     set((state) => {
-      const id = `${type}-${crypto.randomUUID()}`;
+      const id = `${type}-${randomId()}`;
       const nextNodeNumber = Math.max(
         0,
         ...state.nodes.map((node) => node.data.node_number ?? 0),
@@ -671,17 +689,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         ? state.collapsedNodeIds.filter((id) => id !== nodeId)
         : [...state.collapsedNodeIds, nodeId],
     })),
+  nudgeTreeNode: (nodeId, offset) =>
+    set((state) => ({ treeOffsets: { ...state.treeOffsets, [nodeId]: offset } })),
+  resetTreeNudges: () => set({ treeOffsets: {} }),
   formatLayout: () =>
     set((state) => ({
       nodes: autoLayoutNodes(state.nodes, state.edges),
+      treeOffsets: {},
       layoutRevision: state.layoutRevision + 1,
       isDirty: true,
     })),
 
+  clearGraph: () =>
+    set({ nodes: [], edges: [], selectedNodeId: null, collapsedNodeIds: [], treeOffsets: {}, graphLoading: true, isDirty: false }),
+  markGraphReady: () => set({ graphLoading: false }),
   setGraph: (document) => {
     const nodes = cleanNodes(document.nodes);
     const sanitized = cleanEdges(nodes, document.edges);
     const loadedAppearance = { ...defaultFlowAppearance, ...(document.appearance ?? {}) };
+    // The Minimal layout was retired; bots saved with it fall back to the Card layout.
+    if ((loadedAppearance.layout_style as string) === "minimal") loadedAppearance.layout_style = "card";
+    if (!Array.isArray(loadedAppearance.links)) loadedAppearance.links = [];
+    // Bots saved before the accent colour existed get a darker shade of their own primary, not the generic default.
+    if (!document.appearance?.accent_color) loadedAppearance.accent_color = darkenHex(loadedAppearance.primary_color, 0.3);
     const hasLegacyDefaultDescription = loadedAppearance.description === "We are online and ready to help.";
     if (hasLegacyDefaultDescription) loadedAppearance.description = "";
     set({
@@ -690,6 +720,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       appearance: loadedAppearance,
       settings: { ...defaultFlowSettings, ...(document.settings ?? {}) },
       selectedNodeId: null,
+      treeOffsets: {},
+      graphLoading: false,
       // Bumping the revision makes the canvas fit the loaded flow; the mount-time fitView ran on an empty graph.
       layoutRevision: get().layoutRevision + 1,
       // Node numbers are re-derived on every save, so assigning them on load is not an unsaved change.

@@ -125,6 +125,7 @@ class DeploymentBootstrap(BaseModel):
     version_number: int | None = None
     start_endpoint: str | None = None
     eligibility_token: str | None = None
+    widget: dict[str, Any] = Field(default_factory=dict)
 
 
 class CustomDomainCreate(BaseModel):

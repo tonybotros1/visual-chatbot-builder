@@ -50,6 +50,8 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
   const markSaved = useFlowStore((state) => state.markSaved);
   const searchQuery = useFlowStore((state) => state.searchQuery);
   const setGraph = useFlowStore((state) => state.setGraph);
+  const clearGraph = useFlowStore((state) => state.clearGraph);
+  const markGraphReady = useFlowStore((state) => state.markGraphReady);
   const setSearchQuery = useFlowStore((state) => state.setSearchQuery);
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [message, setMessage] = useState("Loading component…");
@@ -76,6 +78,7 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
   }, [message]);
 
   const loadDraft = useCallback(async () => {
+    clearGraph();
     const local = window.localStorage.getItem(localStorageKey(subflowId));
     if (local) {
       try {
@@ -105,10 +108,11 @@ export function SubflowWorkspace({ subflowId }: { subflowId: string }) {
         router.replace("/login");
         return;
       }
+      markGraphReady();
       setSaveState(local ? "local" : "error");
       setMessage(local ? "Backend unavailable — browser draft loaded" : "Could not load component");
     }
-  }, [router, setGraph, subflowId]);
+  }, [clearGraph, markGraphReady, router, setGraph, subflowId]);
 
   useEffect(() => { void loadDraft(); }, [loadDraft]);
 

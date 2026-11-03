@@ -1,13 +1,13 @@
 # Spaghetti — working notes for Claude Code
 
-Spaghetti is a visual chatbot / conversational-form builder: a React Flow canvas (Next.js 16) backed by a FastAPI + PostgreSQL API that owns validation and execution, plus a separate admin console. Read `README.md` for the product overview and the full list of features; this file is about how to work on the repo without breaking it.
+Spaghetti is a visual chatbot / conversational-form builder: a React Flow canvas (Next.js 16) backed by a FastAPI + PostgreSQL API that owns validation and execution, plus an admin console inside the builder at `/admin`. Read `README.md` for the product overview and the full list of features; this file is about how to work on the repo without breaking it.
 
 ## Repository and machines
 
 - **GitHub is the source of truth:** `https://github.com/tonybotros1/visual-chatbot-builder`, branch `main`.
 - The owner works from more than one computer. **Always start a session with `git pull origin main`** and **always finish by committing and pushing** — uncommitted work on one machine is invisible on the other.
 - `main` is pushed to directly (no PR flow yet). Make focused commits with a real message; don't call them "edits".
-- Attribution and CI: every push to `main` runs `.github/workflows/ci.yml` (backend tests + migrations on an empty DB, frontend build, admin build, then the smoke suite on a fresh Compose stack). Don't push red: run the checks below first.
+- Attribution and CI: every push to `main` runs `.github/workflows/ci.yml` (backend tests + migrations on an empty DB, frontend build, then the smoke suite on a fresh Compose stack). Don't push red: run the checks below first.
 
 ## First-time setup on a new computer
 
@@ -43,14 +43,14 @@ The database lives in the Docker volume `postgres_data` on each machine; bots cr
 | Path | What it is |
 |---|---|
 | `frontend/` | Builder app (Next.js 16, React 19, `@xyflow/react`, Zustand). Styles live in `app/globals.css`. |
-| `admin/` | Admin console (Next.js 16, plain CSS, no Tailwind). Separate container on port 3100; talks to `/api/admin/*`. |
+| `frontend/app/admin/`, `frontend/components/admin/` | Admin console (Overview, Accounts, Bots, Deliveries, Audit log, Branding), reachable from the dashboard gear icon for `superadmin` accounts; talks to `/api/admin/*`. |
 | `backend/app/` | FastAPI app: `api/routes/*` per domain, `engine/` (validator, executor, subflows, logic, targeting), `services/`, `models/`, `schemas/`. |
-| `backend/migrations/versions/` | Alembic migrations, numbered `0001`…`0014`. Add the next number; never edit an applied one. |
+| `backend/migrations/versions/` | Alembic migrations, numbered `0001`…`0015`. Add the next number; never edit an applied one. |
 | `backend/scripts/smoke_*.py` | End-to-end API checks run inside the backend container. |
-| `backend/tests/` | pytest unit/regression tests (52). |
+| `backend/tests/` | pytest unit/regression tests (63). |
 | `backend/constraints.txt` | Exact pinned Python versions; `requirements*.txt` keep ranges. Install with `-c constraints.txt`. |
 
-Before touching Next.js code, read `frontend/AGENTS.md` (also copied to `admin/AGENTS.md`): this is Next.js 16 with breaking changes; check `node_modules/next/dist/docs/` rather than relying on memory. Known gotcha: a prerendered page cannot call `useSearchParams` without a Suspense boundary — read `window.location` in an effect instead.
+Before touching Next.js code, read `frontend/AGENTS.md`: this is Next.js 16 with breaking changes; check `node_modules/next/dist/docs/` rather than relying on memory. Known gotcha: a prerendered page cannot call `useSearchParams` without a Suspense boundary — read `window.location` in an effect instead.
 
 ## Verification — run before every push
 
@@ -58,9 +58,8 @@ Before touching Next.js code, read `frontend/AGENTS.md` (also copied to `admin/A
 # backend (from backend/, with a venv created from requirements-dev.txt -c constraints.txt)
 python -m pytest -q
 
-# frontend and admin
+# frontend
 cd frontend && npm run typecheck && npm run build
-cd ../admin && npm run typecheck && npm run build
 
 # smoke suite, with the Compose stack running
 docker compose exec backend python -m scripts.smoke_test
@@ -71,7 +70,7 @@ docker compose exec backend python -m scripts.smoke_release
 
 Browser-test any visual or canvas change in a real browser; there are no frontend unit/E2E tests yet (adding Playwright is the top open task).
 
-If the Compose frontend ever crashes with a Turbopack "task type" panic, it's the `.next` cache: `docker compose down` and remove the `frontend_next` / `admin_next` volumes.
+If the Compose frontend ever crashes with a Turbopack "task type" panic, it's the `.next` cache: `docker compose down` and remove the `frontend_next` volume.
 
 ## Rules that must hold
 
@@ -80,6 +79,16 @@ Security / data
 - Backend validation and execution are authoritative; the browser only edits the flow document.
 - Published bot, subflow, and logic versions are immutable; deployments pin versions.
 - Webhook targets must be public HTTPS (SSRF guard stays).
+- Chat layouts (`appearance.layout_style`): Card (bar header), Personal (compact centred gradient header), Modern (primary header, accent stripe, squared corners, uppercase options) and Spotlight (white card on a full-colour page, avatar medallion overlapping the top; the runtime wraps the shell in `.chat-spotlight-backdrop`). Minimal was retired (bots saved with it load as Card). Each has a `.design-style-<name>` block for the Design preview and a matching `.chat-layout-<name>` block for the runtime at the end of `globals.css`; keep the two in step when changing one.
+- Design tab structure (Collect.chat-style): an Avatar + Theme colour card (reply avatar, primary colour with quick swatches, other colours under "More colours"), then a Widget | Page card. Widget holds `appearance.widget_position` (left/center/right) and `appearance.widget_welcome`; Page holds the layout picker (Card, Personal, Modern, Spotlight), title, description, profile picture and `appearance.links` (shown under the title in the chat header). The preview on the right is a browser frame with Widget / Page / Embed tabs; the Widget mock opens the popup only when the welcome toggle is on. The published values reach the website widget through `DeploymentBootstrap.widget` (`_widget_config` in `routes/deployments.py`: position, welcome + first question text, launcher avatar, primary colour) and the shared `WIDGET_LAUNCHER_JS` used by both `/public/sdk/v1.js` and `/public/deployments/{key}/embed.js` (round avatar launcher, welcome bubble, panel aligned to the same side).
+- Responses page: rows are labelled `Response #N` (`ConversationRead.response_number`, 1-based per bot by start time), paged 10 at a time in the browser, and each answer carries `question` (node label as plain text, components included) and `answer_text` (option labels instead of stored values) computed in `_conversation_read`.
+- `settings.delivery_mode` is no longer edited anywhere in the UI (the "Default delivery type" card was removed as a duplicate of the Share tab's channel picker); the Share tab opens on the channel used last for that bot (`spaghetti:share-mode:<botId>` in localStorage, default `link`). Keep the field for compatibility only.
+- Every bot gets a 7-character `share_code` on first read (`ensure_share_code` in `api/routes/bots.py`, migration 0017). `/r/<code>` (frontend `app/r/[code]`) resolves it through the public `GET /api/public/r/<code>` to the published bot and renders its latest published version (deployment-specific links stay on the Deploy page); the Share tab's Link section shows this short link, social share buttons, the custom domain and a social preview. Builder pages can switch tabs by dispatching `spaghetti:open-tab` with the tab name.
+- Share links, QR codes and embed snippets use the platform **public address** when an admin set one (admin console → Access → Public address; `GET /api/platform/site` public, `PUT` super admin, key `site` in `platform_settings`), otherwise the address the page was opened with. Components get it from `hooks/usePublicSiteUrl.ts`, never from `window.location` directly.
+- The app is used over plain `http://<LAN-IP>`, which browsers treat as an insecure context: never call `crypto.randomUUID()` (undefined there); use `randomId()` from `services/ids.ts`, and copy with `copyText()` from `services/clipboard.ts` (falls back to the selection-based copy when `navigator.clipboard` is missing). The builder preview redirects to `/login?next=…` on a 401 and the login page honours `next`.
+- LAN access: `services/api.ts` exports `apiBaseUrl()`/`siteBaseUrl()`, which swap a localhost default for the hostname the page was opened with, so `http://<LAN-IP>:3000` talks to `http://<LAN-IP>:8000/api` with no rebuild. Never read `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SITE_URL` directly elsewhere. The backend's `cors_origin_regex` accepts private-network origins by default.
+- Bot visibility is a platform setting (`platform_settings` key `access`, `GET/PUT /api/platform/access`, admin console → Access): `private` (owner + invited collaborators, the default in code and tests), `view` (every account is at least viewer on every bot) or `edit` (at least editor). `resolve_role`/`access_role` in `api/routes/bots.py` compute the caller's role; platform admins are `admin` on every bot and owners are `owner` (rank 4). Moving a bot between workspaces needs the `admin` rank (owner, admin collaborator or platform admin). `BotRead` carries `owner_name` and `access_role`, and the dashboard hides Rename/Archive/Move accordingly. Workspaces follow the same rule: under `view`/`edit` (or for platform admins) `GET /api/workspaces` returns every account's workspaces with `can_manage` (creator or platform admin) and bots can be filed into any of them; under `private` they stay personal.
+- The **platform owner** is the account named by `SUPER_ADMIN_EMAIL` (`User.is_owner`): seeded as an active super admin on every start, and `guard_owner` in `api/routes/admin.py` refuses role/access changes and deletion for it (other admins cannot even reset its password). The UI shows it with an Owner pill and no destructive actions.
 - `/api/admin/*` requires `role == "superadmin"` (`get_super_admin` dependency). Disabled accounts (`is_active = false`) cannot sign in.
 
 Product conventions (the owner has asked for these; don't undo them)
@@ -96,7 +105,12 @@ Product conventions (the owner has asked for these; don't undo them)
 - Public link slugs are stable: renaming a bot keeps its slug, the slug is edited explicitly (Settings > General, `PUT /api/bots/{id}` with `slug`), and archiving a bot releases its slug.
 - QA scenarios' `expected` accepts only `status`, `terminal_node_id` and `variables`; unknown keys are rejected so a typo cannot pass silently.
 - The canvas has two views toggled from the toolbar (before Auto arrange) and remembered per browser in localStorage (`spaghetti:canvas-view`): **Detailed** shows full node content; **Compact** (`.flow-canvas.is-compact`) uses fixed 260px cards, clamps labels to three lines, hides descriptions, adds a category stripe and fades everything except the selected node and its neighbours. Both are CSS-only on top of the same node components.
-- The canvas also has two layouts, switched with the `Flow | Tree` control next to the view toggle and remembered per browser (`spaghetti:canvas-layout`). **Flow** uses the saved positions. **Tree** (`components/flow/tree-layout.ts`) computes a top-down hierarchy from Start in option order, centres parents over children, draws parent-to-child edges with `TreeEdge` and every other connection into a shared node as a `JumpStubEdge` chip ("Not now · #30") that pans to the target; nodes are not draggable, saved positions are untouched, and a branch folds from the chevron in the node header (or double-click). Target handles move to the top centre and plain source handles to the bottom centre by CSS in tree mode.
+- File uploads go to **Azure Blob Storage** when `AZURE_STORAGE_*` (or `AZURE_STORAGE_CONNECTION_STRING`) is set in `.env` (`app/services/azure_blob.py`, REST + Shared Key, no SDK; container `spaghetti-uploads` is created on demand); otherwise they stay on disk under `UPLOAD_DIRECTORY`. `StoredFile.storage_provider` is `local`, `azure` or `s3`; a NULL `connection_id` with `azure` means the platform account. A bot can still point a file-upload node at its own "storage" integration connection: config `{provider: "azure", account, container}` + secret `account_key`, or the S3 shape. The account key lives only in `.env`, never in source or logs.
+- Chat avatars: `appearance.avatar_url` (header profile picture) and `appearance.reply_avatar` (`profile` | `custom` | `hidden`, with `reply_avatar_url`) decide the `.chat-reply-avatar` element beside bot bubbles (a real element, not a pseudo-element, so the default mark can render). Pictures are stored inline as data URLs; the Design tab downscales uploads to 512px in the browser (`prepareAvatarImage`, sources up to 25 MB) and offers built-in presets from `frontend/public/avatars/*.svg`, inlined on pick.
+- **Branding** is platform-wide: `GET /api/branding` (public) and `PUT /api/branding` (super admin) read/write the `branding` row of `platform_settings` (`primary_color`, `secondary_color`). `components/brand/BrandingProvider.tsx` sets `--brand-primary`/`--brand-secondary` on `<html>` from a localStorage cache and then the API. CSS rule: UI states (hover, focus, active, links, selection) use `var(--brand)`; `var(--brand-secondary)` is only for logic/component node accents and decorative contrast; never hard-code the hex values. Super admins edit colours in the admin console (`/admin#branding`).
+- Dropdowns are never native `<select>`: use `components/ui/Select.tsx` (`Select` with `{ value, label }` options, `ariaLabel`, optional `size="sm"`; filter box appears automatically for 10+ options; the menu flips upward near the viewport bottom). Styles live under `.spaghetti-select*`; a dialog that contains one gets `overflow: visible` via `.app-dialog:has(.spaghetti-select)`.
+- Dashboard **workspaces** (`workspaces` table, `bots.workspace_id` nullable FK with `ON DELETE SET NULL`, routes in `api/routes/workspaces.py`) are per-account folders: only the bot owner can file a bot into one of their own workspaces (`BotUpdate.workspace_id`; an explicit `null` moves it to Unsorted, leaving the field out keeps it; collaborators get 403). Deleting a workspace never touches bots. The dashboard (`app/dashboard/page.tsx`) shows them as a left nav (All bots / workspaces / Unsorted) with the selected folder's bots in a grid of `.bot-tile` cards and a Move menu per card; the selection is remembered in `spaghetti:workspace`.
+- The canvas also has two layouts, switched with the `Flow | Tree` control next to the view toggle and remembered per browser (`spaghetti:canvas-layout`). **Flow** uses the saved positions. **Tree** (`components/flow/tree-layout.ts`) computes a top-down hierarchy from Start in option order, centres parents over children, draws parent-to-child edges with `TreeEdge` and every other connection into a shared node as a `JumpStubEdge` chip ("Not now · #30") that pans to the target; nodes in the tree can still be dragged, which records a per-node nudge from the computed slot (`treeOffsets` in the store; not saved, cleared by Auto arrange and on load) while saved positions stay untouched; nodes not reachable from Start keep their saved position and drag normally, so a freshly added node lands where it was dropped; a branch folds from the chevron in the node header (or double-click). Target handles move to the top centre and plain source handles to the bottom centre by CSS in tree mode.
 - Edge routing (`components/edges/ObstacleAwareEdge.tsx`) only re-routes edges whose endpoints move while a node is dragged and only considers nodes in the edge's horizontal band; keep it that way, a 100-node flow froze before.
 
 ## Current state (as of 2026-10-30)

@@ -69,8 +69,18 @@ def overview(db: Annotated[Session, Depends(get_db)]) -> AdminOverview:
     )
 
 
+def guard_owner(target: User, admin: User, values: dict) -> None:
+    """The platform owner keeps admin access forever; only they may change their own name or password."""
+    if not target.is_owner:
+        return
+    if "role" in values or "is_active" in values:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The platform owner's role and access cannot be changed")
+    if target.id != admin.id and values:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the platform owner can change their own account")
+
+
 def _user_read(user: User, bot_count: int) -> AdminUserRead:
-    return AdminUserRead(id=user.id, name=user.name, email=user.email, role=user.role, is_active=user.is_active, created_at=user.created_at, bot_count=bot_count)
+    return AdminUserRead(id=user.id, name=user.name, email=user.email, role=user.role, is_active=user.is_active, created_at=user.created_at, bot_count=bot_count, is_owner=user.is_owner)
 
 
 @router.get("/users", response_model=list[AdminUserRead])
@@ -102,6 +112,7 @@ def update_user(user_id: UUID, payload: AdminUserUpdate, admin: Annotated[User, 
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     values = payload.model_dump(exclude_unset=True)
+    guard_owner(user, admin, values)
     losing_admin = (values.get("role") == "user" or values.get("is_active") is False) and user.role == "superadmin"
     if losing_admin and user.id == admin.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot remove your own admin access")
@@ -131,6 +142,8 @@ def delete_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.is_owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The platform owner account cannot be deleted")
     if user.id == admin.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account")
     if user.role == "superadmin" and _superadmin_count(db, exclude=user.id) == 0:

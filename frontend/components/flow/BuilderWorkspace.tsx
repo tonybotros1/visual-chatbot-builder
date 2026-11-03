@@ -160,11 +160,14 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const setViewMode = useFlowStore((state) => state.setViewMode);
   const layoutMode = useFlowStore((state) => state.layoutMode);
   const setLayoutMode = useFlowStore((state) => state.setLayoutMode);
+  const resetTreeNudges = useFlowStore((state) => state.resetTreeNudges);
   const isDirty = useFlowStore((state) => state.isDirty);
   const appearance = useFlowStore((state) => state.appearance);
   const markSaved = useFlowStore((state) => state.markSaved);
   const searchQuery = useFlowStore((state) => state.searchQuery);
   const setGraph = useFlowStore((state) => state.setGraph);
+  const clearGraph = useFlowStore((state) => state.clearGraph);
+  const markGraphReady = useFlowStore((state) => state.markGraphReady);
   const selectNode = useFlowStore((state) => state.selectNode);
   const setSearchQuery = useFlowStore((state) => state.setSearchQuery);
   const [saveState, setSaveState] = useState<SaveState>("loading");
@@ -173,6 +176,16 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const [flash, setFlash] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [activeTab, setActiveTab] = useState<"questions" | "design" | "share" | "settings">("questions");
+
+  // Other builder pages (for example Share → "Customize") can ask for a tab by dispatching this event.
+  useEffect(() => {
+    const onOpenTab = (event: Event) => {
+      const tab = (event as CustomEvent<string>).detail;
+      if (tab === "questions" || tab === "design" || tab === "share" || tab === "settings") setActiveTab(tab);
+    };
+    window.addEventListener("spaghetti:open-tab", onOpenTab);
+    return () => window.removeEventListener("spaghetti:open-tab", onOpenTab);
+  }, []);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -196,6 +209,8 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const loadDraft = useCallback(async () => {
     setSaveState("loading");
     setMessage("Loading draft…");
+    // Start from an empty canvas: no demo graph and no leftovers from the previous bot.
+    clearGraph();
 
     const local = window.localStorage.getItem(localStorageKey(botId));
     if (local) {
@@ -223,10 +238,11 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
         router.replace("/dashboard?notice=bot-unavailable");
         return;
       }
+      markGraphReady();
       setSaveState(local ? "local" : "error");
-      setMessage(local ? "Backend unavailable — browser draft loaded" : "Backend unavailable — demo graph ready");
+      setMessage(local ? "Backend unavailable — browser draft loaded" : "Backend unavailable — could not load this bot");
     }
-  }, [botId, router, setGraph]);
+  }, [botId, clearGraph, markGraphReady, router, setGraph]);
 
   useEffect(() => {
     void loadDraft();
@@ -380,10 +396,15 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
               <button
                 className="secondary-button compact-action"
                 onClick={() => {
-                  formatLayout();
-                  setMessage("Nodes arranged for easier reading — save to keep the layout");
+                  if (layoutMode === "tree") {
+                    resetTreeNudges();
+                    setMessage("Moved nodes are back in the tree");
+                  } else {
+                    formatLayout();
+                    setMessage("Nodes arranged for easier reading — save to keep the layout");
+                  }
                 }}
-                title="Automatically arrange nodes into readable columns"
+                title={layoutMode === "tree" ? "Put moved nodes back into the tree" : "Automatically arrange nodes into readable columns"}
                 type="button"
               >
                 <LayoutDashboard size={15} /> Auto arrange
@@ -422,11 +443,11 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
                   </div>
                 ) : null}
               </div>
-              <button className="secondary-button compact-action" onClick={() => void handlePublish()} type="button">
-                <Send size={15} /> Publish
-              </button>
             </>
           ) : null}
+          <button className="secondary-button compact-action" onClick={() => void handlePublish()} type="button">
+            <Send size={15} /> Publish
+          </button>
           <button className="primary-button save-draft-button" onClick={() => void handleSave()} disabled={saveState === "saving"} type="button">
             <Save size={15} /> {saveState === "saving" ? "Saving…" : "Save draft"}
           </button>

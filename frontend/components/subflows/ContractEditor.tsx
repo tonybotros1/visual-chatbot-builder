@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/Select";
 import { Plus, Trash2, X } from "lucide-react";
 import type { FactDefinition, FactSchema, FactType } from "@/types/flow";
 
@@ -101,13 +102,13 @@ function ContractSection({
         <div className="contract-field" key={`${prefix}-${fieldIndex}`}>
           <div className="contract-field-main">
             <input aria-label={`${title} fact name`} defaultValue={name} onBlur={(event) => rename(name, event.target.value)} />
-            <select
-              aria-label={`${name} type`}
+            <Select
+              size="sm"
+              ariaLabel={`${name} type`}
               value={definition.type}
-              onChange={(event) => update(name, { ...definition, type: event.target.value as FactType })}
-            >
-              {factTypes.map((factType) => <option key={factType} value={factType}>{factType}</option>)}
-            </select>
+              options={factTypes.map((factType) => ({ value: factType, label: factType }))}
+              onChange={(value) => update(name, { ...definition, type: value as FactType })}
+            />
             <button
               className="mini-icon-button"
               aria-label={`Remove ${name}`}

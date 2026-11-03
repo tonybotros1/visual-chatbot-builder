@@ -27,6 +27,7 @@ class AdminUserRead(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    is_owner: bool = False
     created_at: datetime
     bot_count: int = 0
 

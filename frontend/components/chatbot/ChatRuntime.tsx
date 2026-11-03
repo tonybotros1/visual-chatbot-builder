@@ -1,5 +1,6 @@
 "use client";
 
+import { randomId } from "@/services/ids";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ExternalLink, RefreshCw, Send, Star } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
@@ -83,6 +84,11 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
       setConversationId(state.conversation_id);
       await applyState(state, [], sequence);
     } catch (caught) {
+      if (botId && caught && typeof caught === "object" && "status" in caught && (caught as { status?: number }).status === 401) {
+        // The builder preview is for signed-in builders; the session lives per address, so a new address means signing in again.
+        window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        return;
+      }
       if (sequence === responseSequence.current) {
         setError(caught instanceof Error ? caught.message : t.couldNotStart);
       }
@@ -114,14 +120,14 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
 
   const applyState = async (state: ConversationState, prefix: ChatMessage[], sequence: number) => {
     const botMessages: ChatMessage[] = state.messages.map((item) => ({
-      id: `${item.id}-${crypto.randomUUID()}`,
+      id: `${item.id}-${randomId()}`,
       sender: "bot",
       text: String(item.data.label ?? ""),
       node: item,
     }));
     if (state.next_node) {
       botMessages.push({
-        id: `${state.next_node.id}-${crypto.randomUUID()}`,
+        id: `${state.next_node.id}-${randomId()}`,
         sender: "bot",
         text: String(state.next_node.data.label ?? (state.status === "completed" ? t.conversationComplete : t.yourAnswer)),
         node: state.next_node,
@@ -168,7 +174,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
     try {
       const state = await answerConversation(conversationId, node.id, answer);
       if (sequence !== responseSequence.current) return;
-      await applyState(state, [{ id: crypto.randomUUID(), sender: "user", text: displayValue }], sequence);
+      await applyState(state, [{ id: randomId(), sender: "user", text: displayValue }], sequence);
       setValue("");
       setSelected([]);
     } catch (caught) {
@@ -251,9 +257,15 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
     "--chat-background": appearance.background_color ?? "#FFFFFF",
     "--chat-surface": appearance.surface_color ?? "#FFFFFF",
     "--chat-text": appearance.text_color ?? "#211D29",
-    "--chat-avatar": appearance.avatar_url ? `url("${appearance.avatar_url}")` : "none",
+    "--chat-accent": appearance.accent_color || appearance.primary_color || "#7C3AED",
   } as CSSProperties;
   const isSpotlight = appearance.layout_style === "spotlight";
+  const replyMode = appearance.reply_avatar ?? "profile";
+  const headerLinks = (appearance.links ?? []).filter((link) => link.url?.trim());
+  const replyAvatarUrl = replyMode === "custom" && appearance.reply_avatar_url ? appearance.reply_avatar_url : appearance.avatar_url;
+  const replyAvatar = replyMode !== "hidden" ? (
+    <span className="chat-reply-avatar" aria-hidden="true">{replyAvatarUrl ? <img src={replyAvatarUrl} alt="" /> : <SpaghettiMark size={22} title="" />}</span>
+  ) : null;
 
   if (!appearanceReady) {
     return (
@@ -268,12 +280,20 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
   }
 
   const shell = (
-    <section className={`chat-shell chat-layout-${appearance.layout_style ?? "card"}`} dir={direction} lang={activeLocale} style={chatStyle}>
+    <section className={`chat-shell chat-layout-${appearance.layout_style ?? "card"}${replyAvatar ? " has-reply-avatar" : ""}`} dir={direction} lang={activeLocale} style={chatStyle}>
       <header className="chat-header">
         <span className="chat-profile-picture">
           {appearance.avatar_url ? <img src={appearance.avatar_url} alt="Chat profile" /> : <SpaghettiMark size={31} />}
         </span>
-        <div><strong>{appearance.title || title}</strong>{appearance.description ? <span>{appearance.description}</span> : null}</div>
+        <div>
+          <strong>{appearance.title || title}</strong>
+          {appearance.description ? <span>{appearance.description}</span> : null}
+          {headerLinks.length ? (
+            <nav className="chat-header-links" aria-label="Links">
+              {headerLinks.map((link, index) => <a key={`${link.url}-${index}`} href={link.url} target="_blank" rel="noreferrer">{link.label || link.url}</a>)}
+            </nav>
+          ) : null}
+        </div>
         <button className="icon-button" type="button" aria-label={t.restart} title={t.restart} onClick={() => void begin()}><RefreshCw size={16} /></button>
       </header>
       {runtimeSettings.show_progress_bar ? (
@@ -285,6 +305,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
         {busy && messages.length === 0 ? <p className="chat-placeholder">{t.starting}</p> : null}
         {messages.map((message) => (
           <div className={`chat-bubble chat-bubble-${message.sender}`} key={message.id}>
+            {message.sender === "bot" ? replyAvatar : null}
             {message.sender === "bot" ? <RichText content={message.text} /> : <span>{message.text}</span>}
             {message.node?.type === "links" ? (
               <div className="chat-linked-actions">
@@ -319,6 +340,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
         ))}
         {isTyping ? (
           <div className="chat-bubble chat-bubble-bot chat-typing" aria-label={t.typing}>
+            {replyAvatar}
             <span />
             <span />
             <span />

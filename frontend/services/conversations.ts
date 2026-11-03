@@ -1,4 +1,4 @@
-import { apiFetch, getToken } from "./api";
+import { apiBaseUrl, apiFetch, getToken } from "./api";
 import type { ConversationRecord, ConversationState, DeploymentBootstrap } from "@/types/api";
 
 export const startPreview = (botId: string, locale?: string) =>
@@ -36,8 +36,7 @@ export const getConversation = (conversationId: string) =>
 export const updateConversation = (conversationId: string, payload: { status?: string; tags?: string[]; note?: string }) =>
   apiFetch<ConversationRecord>(`/conversations/${conversationId}`, { method: "PATCH", body: JSON.stringify(payload) });
 export async function downloadResponses(botId: string, format: "csv" | "json" | "xlsx") {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
-  const response = await fetch(`${apiUrl}/bots/${botId}/responses/export?format=${format}`, {
+  const response = await fetch(`${apiBaseUrl()}/bots/${botId}/responses/export?format=${format}`, {
     headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
   });
   if (!response.ok) throw new Error(`Export failed (${response.status})`);

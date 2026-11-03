@@ -1,5 +1,7 @@
 "use client";
 
+import { copyText } from "@/services/clipboard";
+import { Select } from "@/components/ui/Select";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getBot, updateBot } from "@/services/bots";
@@ -12,11 +14,8 @@ import {
   ExternalLink,
   Globe2,
   Languages,
-  Link2,
   Mail,
-  MessageCircleMore,
   MonitorUp,
-  PanelTopOpen,
   Plus,
   Settings2,
   SlidersHorizontal,
@@ -43,17 +42,6 @@ const sections: Array<{ id: SettingsSection; label: string; icon: typeof Setting
   { id: "notifications", label: "Notifications", icon: BellRing },
   { id: "translations", label: "Translations", icon: Languages },
   { id: "data", label: "Data collection", icon: Database },
-];
-
-const deliveryModes: Array<{
-  id: FlowSettings["delivery_mode"];
-  label: string;
-  description: string;
-  icon: typeof MessageCircleMore;
-}> = [
-  { id: "widget", label: "Widget", description: "Floating website chat", icon: MessageCircleMore },
-  { id: "link", label: "Share link", description: "Standalone chat page", icon: Link2 },
-  { id: "embed", label: "Embed", description: "Inline on your page", icon: PanelTopOpen },
 ];
 
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {
@@ -126,7 +114,7 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
   };
 
   const copyBotId = async () => {
-    await navigator.clipboard.writeText(botId);
+    await copyText(botId);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -215,24 +203,6 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
                 </div>
               </article>
 
-              <fieldset className="settings-fieldset">
-                <legend>Default delivery type</legend>
-                <p>Used as the starting choice when you create a new deployment.</p>
-                <div className="settings-delivery-grid">
-                  {deliveryModes.map((mode) => {
-                    const Icon = mode.icon;
-                    return (
-                      <button className={settings.delivery_mode === mode.id ? "is-active" : ""} key={mode.id} type="button" onClick={() => updateSettings({ delivery_mode: mode.id })}>
-                        <span><Icon size={19} /></span>
-                        <strong>{mode.label}</strong>
-                        <small>{mode.description}</small>
-                        {settings.delivery_mode === mode.id ? <Check className="settings-choice-check" size={14} /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
               <div className="settings-form-card">
                 <label>
                   Chatbot title
@@ -260,9 +230,7 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
                 </label>
                 <label>
                   Time zone
-                  <select value={settings.timezone} onChange={(event) => updateSettings({ timezone: event.target.value })}>
-                    {timezones.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
-                  </select>
+                  <Select ariaLabel="Time zone" value={settings.timezone} options={timezones.map((timezone) => ({ value: timezone, label: timezone }))} onChange={(timezone) => updateSettings({ timezone })} />
                   <small>Used for appointment and schedule display.</small>
                 </label>
                 <label>
@@ -339,15 +307,8 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
                   <div className="notification-filter-heading"><div><strong>Answer filters</strong><p>All configured rules must match.</p></div><button type="button" onClick={() => updateSettings({ notification_filters: [...settings.notification_filters, { variable: notificationVariables[0] ?? "", operator: "equals", value: "" }] })}><Plus size={14} /> Add filter</button></div>
                   {settings.notification_filters.length ? settings.notification_filters.map((filter, index) => (
                     <div className="notification-filter-item" key={`${index}-${filter.variable}`}>
-                      <select aria-label={`Filter ${index + 1} field`} value={filter.variable} onChange={(event) => updateNotificationFilter(index, { variable: event.target.value })}>
-                        <option value="">Select answer</option>
-                        {notificationVariables.map((variable) => <option key={variable} value={variable}>{variable}</option>)}
-                      </select>
-                      <select aria-label={`Filter ${index + 1} operator`} value={filter.operator} onChange={(event) => updateNotificationFilter(index, { operator: event.target.value as FlowSettings["notification_filters"][number]["operator"] })}>
-                        <option value="equals">Equals</option>
-                        <option value="not_equals">Does not equal</option>
-                        <option value="contains">Contains</option>
-                      </select>
+                      <Select ariaLabel={`Filter ${index + 1} field`} value={filter.variable} options={[{ value: "", label: "Select answer" }, ...notificationVariables.map((variable) => ({ value: variable, label: variable }))]} onChange={(variable) => updateNotificationFilter(index, { variable })} />
+                      <Select ariaLabel={`Filter ${index + 1} operator`} value={filter.operator} options={[{ value: "equals", label: "Equals" }, { value: "not_equals", label: "Does not equal" }, { value: "contains", label: "Contains" }]} onChange={(operator) => updateNotificationFilter(index, { operator: operator as FlowSettings["notification_filters"][number]["operator"] })} />
                       <input aria-label={`Filter ${index + 1} value`} placeholder="Value" value={filter.value} onChange={(event) => updateNotificationFilter(index, { value: event.target.value })} />
                       <button aria-label={`Delete filter ${index + 1}`} type="button" onClick={() => updateSettings({ notification_filters: settings.notification_filters.filter((_, filterIndex) => filterIndex !== index) })}><Trash2 size={15} /></button>
                     </div>
@@ -360,21 +321,13 @@ export function SettingsWorkspace({ botId }: { botId: string }) {
                 <div>
                   <input id="notification-subject" value={settings.notification_subject} onChange={(event) => updateSettings({ notification_subject: event.target.value })} />
                   <span className="notification-subject-plus">+</span>
-                  <select aria-label="Append to notification subject" value={settings.notification_subject_append} onChange={(event) => updateSettings({ notification_subject_append: event.target.value as FlowSettings["notification_subject_append"] })}>
-                    <option value="none">Nothing</option>
-                    <option value="chatbot_title">Chatbot title</option>
-                    <option value="status">Response status</option>
-                    <option value="session_id">Session ID</option>
-                  </select>
+                  <Select ariaLabel="Append to notification subject" value={settings.notification_subject_append} options={[{ value: "none", label: "Nothing" }, { value: "chatbot_title", label: "Chatbot title" }, { value: "status", label: "Response status" }, { value: "session_id", label: "Session ID" }]} onChange={(value) => updateSettings({ notification_subject_append: value as FlowSettings["notification_subject_append"] })} />
                 </div>
               </article>
 
               <article className="notification-form-row">
                 <label htmlFor="notification-reply-to"><strong>Reply to</strong><span>Reply directly to the email answer captured from the visitor.</span></label>
-                <select id="notification-reply-to" value={settings.notification_reply_to_variable} onChange={(event) => updateSettings({ notification_reply_to_variable: event.target.value })}>
-                  <option value="">No reply-to address</option>
-                  {emailVariables.map((variable) => <option key={variable} value={variable}>{variable}</option>)}
-                </select>
+                <Select id="notification-reply-to" ariaLabel="Reply to" value={settings.notification_reply_to_variable} options={[{ value: "", label: "No reply-to address" }, ...emailVariables.map((variable) => ({ value: variable, label: variable }))]} onChange={(notification_reply_to_variable) => updateSettings({ notification_reply_to_variable })} />
               </article>
             </div>
 

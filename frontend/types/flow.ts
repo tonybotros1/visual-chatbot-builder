@@ -112,8 +112,26 @@ export type FlowAppearance = {
   background_color: string;
   surface_color: string;
   text_color: string;
+  /** Stripes, bubble edges and other highlights that should stand apart from the primary colour. */
+  accent_color: string;
   avatar_url: string;
-  layout_style: "card" | "personal" | "modern" | "minimal" | "spotlight";
+  /** Avatar beside each bot reply: the profile picture, a separate image, or none. */
+  reply_avatar: "profile" | "custom" | "hidden";
+  reply_avatar_url: string;
+  layout_style: "card" | "personal" | "modern" | "spotlight";
+  /** Where the website widget launcher sits. */
+  widget_position: WidgetPosition;
+  /** Show the first question as a welcome bubble next to the launcher. */
+  widget_welcome: boolean;
+  /** Links shown under the title on the full-page chat. */
+  links: PageLink[];
+};
+
+export type WidgetPosition = "left" | "center" | "right";
+
+export type PageLink = {
+  label: string;
+  url: string;
 };
 
 export type FlowSettings = {
