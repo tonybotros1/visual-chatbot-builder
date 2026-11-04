@@ -29,6 +29,19 @@ export const apiBaseUrl = () => followPageHost(configuredApiUrl);
 /** Base URL of this site, for public chat links and embeds (no trailing slash). */
 export const siteBaseUrl = () => followPageHost(configuredSiteUrl);
 
+/** FastAPI's `detail` as a sentence: a string as is, a validation list as its messages. */
+function describeDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" && "msg" in item ? String((item as { msg: unknown }).msg) : ""))
+      .filter(Boolean);
+    if (messages.length) return messages.join(" ");
+  }
+  if (detail && typeof detail === "object" && "message" in detail) return String((detail as { message: unknown }).message);
+  return "Request failed";
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -66,7 +79,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     }
     const message =
       typeof detail === "object" && detail && "detail" in detail
-        ? String((detail as { detail: unknown }).detail)
+        ? describeDetail((detail as { detail: unknown }).detail)
         : `Request failed (${response.status})`;
     throw new ApiError(message, response.status, detail);
   }

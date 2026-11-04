@@ -11740,3 +11740,327 @@ select:not([multiple]):not([size])::-ms-expand {
     height: auto;
   }
 }
+
+/* ------------------------------------------------------------------------------------------------
+   Sign-in robot (components/brand/LoginRobot.tsx). Every mood is a data-mood value on .auth-robot;
+   the pupils read --look-x (-1..1) so they can follow the caret across the e-mail field.
+   ------------------------------------------------------------------------------------------------ */
+.auth-robot {
+  --look-x: 0;
+  --look-y: 0;
+  justify-self: center;
+  margin: -8px auto -4px;
+}
+
+.auth-robot svg {
+  display: block;
+  overflow: visible;
+}
+
+.auth-robot .robot-rig {
+  transform-origin: 100px 120px;
+  animation: robot-float 4s ease-in-out infinite;
+}
+
+.auth-robot .robot-head {
+  transform-origin: 100px 100px;
+  transition: transform 260ms ease;
+}
+
+.auth-robot .robot-pupil {
+  transform: translate(calc(var(--look-x) * 4px), calc(var(--look-y) * 3px));
+  transition: transform 180ms ease-out;
+}
+
+.auth-robot .robot-lid {
+  transform-origin: center 58px;
+  transform: scaleY(0);
+  animation: robot-blink 5.5s ease-in-out infinite;
+}
+
+.auth-robot .robot-eye-right .robot-lid {
+  animation-delay: 0.08s;
+}
+
+.auth-robot .robot-mouth {
+  display: none;
+}
+
+.auth-robot .robot-mouth-idle {
+  display: block;
+}
+
+.auth-robot .robot-notes {
+  opacity: 0;
+}
+
+.auth-robot .robot-antenna-light {
+  transition: fill 300ms ease;
+  animation: robot-pulse 2.4s ease-in-out infinite;
+}
+
+.auth-robot .robot-antenna-halo {
+  opacity: 0.7;
+  animation: robot-pulse 2.4s ease-in-out infinite;
+}
+
+.auth-robot .robot-arm {
+  transition: transform 380ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Typing the e-mail: head turns a little with the caret, the pupils do the rest. */
+.auth-robot[data-mood="typing"] .robot-head {
+  transform: rotate(calc(var(--look-x) * 5deg)) translateY(2px);
+}
+
+.auth-robot[data-mood="typing"] .robot-pupil {
+  transform: translate(calc(var(--look-x) * 5px), 3px);
+}
+
+/* Hands rest beside the body; the arms pivot at the shoulder so they can reach the face. */
+.auth-robot .robot-hand {
+  transition: transform 380ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auth-robot .robot-arm-left {
+  transform-origin: 51px 130px;
+}
+
+.auth-robot .robot-arm-right {
+  transform-origin: 149px 130px;
+}
+
+/* Typing the password: peek-a-boo, both hands over the eyes, whistling innocently. */
+.auth-robot[data-mood="cover"] .robot-hand-left {
+  transform: translate(31px, -80px);
+}
+
+.auth-robot[data-mood="cover"] .robot-hand-right {
+  transform: translate(-31px, -80px);
+}
+
+.auth-robot[data-mood="peek"] .robot-hand-right {
+  transform: translate(-31px, -80px);
+}
+
+.auth-robot[data-mood="cover"] .robot-arm-left,
+.auth-robot[data-mood="peek"] .robot-arm-left {
+  transform: rotate(-152deg) scaleY(2.9);
+}
+
+.auth-robot[data-mood="cover"] .robot-arm-right,
+.auth-robot[data-mood="peek"] .robot-arm-right {
+  transform: rotate(152deg) scaleY(2.9);
+}
+
+.auth-robot[data-mood="cover"] .robot-lid {
+  animation: none;
+  transform: scaleY(1);
+}
+
+.auth-robot[data-mood="cover"] .robot-head {
+  animation: robot-head-wander 3.2s ease-in-out infinite;
+}
+
+.auth-robot[data-mood="cover"] .robot-mouth-idle,
+.auth-robot[data-mood="peek"] .robot-mouth-idle {
+  display: none;
+}
+
+.auth-robot[data-mood="cover"] .robot-mouth-whistle,
+.auth-robot[data-mood="peek"] .robot-mouth-whistle {
+  display: block;
+}
+
+.auth-robot[data-mood="cover"] .robot-notes {
+  opacity: 1;
+}
+
+.auth-robot[data-mood="cover"] .robot-note-1 {
+  animation: robot-note 1.6s ease-out infinite;
+}
+
+.auth-robot[data-mood="cover"] .robot-note-2 {
+  animation: robot-note 1.6s ease-out 0.8s infinite;
+}
+
+/* Password revealed: the left hand lifts a little and that eye peeks down at the field. */
+.auth-robot[data-mood="peek"] .robot-hand-left {
+  transform: translate(14px, -100px) rotate(-18deg);
+}
+
+.auth-robot[data-mood="peek"] .robot-eye-right .robot-lid {
+  animation: none;
+  transform: scaleY(1);
+}
+
+.auth-robot[data-mood="peek"] .robot-eye-left .robot-lid {
+  animation: none;
+  transform: scaleY(0.2);
+}
+
+.auth-robot[data-mood="peek"] .robot-pupil {
+  transform: translate(-1px, 4px);
+}
+
+.auth-robot[data-mood="peek"] .robot-head {
+  transform: rotate(-6deg) translateY(2px);
+}
+
+/* Signed in: the hands follow the arms up. */
+.auth-robot[data-mood="happy"] .robot-hand-left {
+  transform: translate(-6px, -16px);
+}
+
+.auth-robot[data-mood="happy"] .robot-hand-right {
+  transform: translate(6px, -16px);
+}
+
+/* Wrong password: a head shake, a frown, a red light. */
+.auth-robot[data-mood="sad"] .robot-head {
+  animation: robot-shake 0.7s ease-in-out 1;
+}
+
+.auth-robot[data-mood="sad"] .robot-mouth-idle {
+  display: none;
+}
+
+.auth-robot[data-mood="sad"] .robot-mouth-sad {
+  display: block;
+}
+
+.auth-robot[data-mood="sad"] .robot-pupil {
+  transform: translate(0, 4px);
+}
+
+.auth-robot[data-mood="sad"] .robot-lid {
+  animation: none;
+  transform: scaleY(0.35);
+}
+
+.auth-robot[data-mood="sad"] .robot-antenna-light {
+  fill: #e0565b;
+}
+
+/* Signed in: a nod, a smile, a green light, arms up. */
+.auth-robot[data-mood="happy"] .robot-head {
+  animation: robot-nod 0.9s ease-in-out 1;
+}
+
+.auth-robot[data-mood="happy"] .robot-mouth-idle {
+  display: none;
+}
+
+.auth-robot[data-mood="happy"] .robot-mouth-happy {
+  display: block;
+}
+
+.auth-robot[data-mood="happy"] .robot-lid {
+  animation: none;
+  transform: scaleY(0.45);
+}
+
+.auth-robot[data-mood="happy"] .robot-antenna-light {
+  fill: #22c55e;
+}
+
+.auth-robot[data-mood="happy"] .robot-arm-left {
+  transform: rotate(-35deg);
+}
+
+.auth-robot[data-mood="happy"] .robot-arm-right {
+  transform: rotate(35deg);
+}
+
+@keyframes robot-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes robot-blink {
+  0%, 92%, 100% { transform: scaleY(0); }
+  95%, 97% { transform: scaleY(1); }
+}
+
+@keyframes robot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes robot-lookaround {
+  0%, 100% { transform: translate(-5px, 0); }
+  25% { transform: translate(-3px, -4px); }
+  50% { transform: translate(5px, -2px); }
+  75% { transform: translate(4px, 3px); }
+}
+
+@keyframes robot-head-wander {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(5deg); }
+}
+
+@keyframes robot-note {
+  0% { opacity: 0; transform: translate(0, 6px); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(10px, -22px); }
+}
+
+@keyframes robot-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px) rotate(-3deg); }
+  40% { transform: translateX(7px) rotate(3deg); }
+  60% { transform: translateX(-5px) rotate(-2deg); }
+  80% { transform: translateX(5px) rotate(2deg); }
+}
+
+@keyframes robot-nod {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(6px) rotate(2deg); }
+  50% { transform: translateY(-2px); }
+  75% { transform: translateY(6px) rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-robot .robot-rig,
+  .auth-robot .robot-lid,
+  .auth-robot .robot-antenna-light,
+  .auth-robot .robot-antenna-halo,
+  .auth-robot[data-mood] .robot-pupil,
+  .auth-robot[data-mood] .robot-head,
+  .auth-robot[data-mood] .robot-note {
+    animation: none;
+  }
+}
+
+/* Password field with the show/hide eye. */
+.auth-password-wrap {
+  position: relative;
+}
+
+.auth-password-wrap input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.auth-eye-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: #8a95a7;
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.auth-eye-toggle:hover {
+  color: var(--ink);
+  background: #f1f4f8;
+}
