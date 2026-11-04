@@ -11241,8 +11241,18 @@ select:not([multiple]):not([size])::-ms-expand {
 /* ------------------------------------------------------------------------------------------------
    Design tab: the cards must never be squeezed when the window is short; the column scrolls instead.
    ------------------------------------------------------------------------------------------------ */
-.design-controls > .design-card {
+/* A flex column: grid auto rows got fitted to the column's fixed height in Chrome, squeezing the cards. */
+.design-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.design-controls > * {
   flex: none;
+}
+
+.design-controls > .design-card {
   min-height: max-content;
 }
 
