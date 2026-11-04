@@ -34,12 +34,13 @@ export default function LoginPage() {
   const [reaction, setReaction] = useState<"sad" | "happy" | null>(null);
   const [lookX, setLookX] = useState(-1);
   const reactionTimer = useRef<number | null>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => { if (reactionTimer.current) window.clearTimeout(reactionTimer.current); }, []);
 
   // The robot's mood: a reaction wins, then whatever the focused field calls for.
   const mood: RobotMood = reaction
-    ?? (focused === "email" ? "typing" : focused === "password" ? (showPassword ? "peek" : "cover") : showPassword && password ? "peek" : "idle");
+    ?? (focused === "email" ? "typing" : showPassword ? "peek" : focused === "password" ? "cover" : "idle");
 
   const react = (next: "sad" | "happy", holdMs: number) => {
     setReaction(next);
@@ -109,6 +110,7 @@ export default function LoginPage() {
             Password
             <div className="auth-password-wrap">
               <input
+                ref={passwordInput}
                 id="login-password"
                 type={showPassword ? "text" : "password"}
                 name="password"
@@ -126,7 +128,17 @@ export default function LoginPage() {
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 aria-pressed={showPassword}
                 title={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword((current) => !current)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setShowPassword((current) => !current);
+                  // The eye never takes the focus: the caret stays in the field and the robot keeps watching it.
+                  const input = passwordInput.current;
+                  if (input) {
+                    input.focus();
+                    const end = input.value.length;
+                    window.requestAnimationFrame(() => input.setSelectionRange(end, end));
+                  }
+                }}
               >
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
