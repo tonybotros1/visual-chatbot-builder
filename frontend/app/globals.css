@@ -11819,6 +11819,8 @@ select:not([multiple]):not([size])::-ms-expand {
 
 /* Hands rest beside the body; the arms pivot at the shoulder so they can reach the face. */
 .auth-robot .robot-hand {
+  transform-box: fill-box;
+  transform-origin: center;
   transition: transform 380ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -11843,8 +11845,7 @@ select:not([multiple]):not([size])::-ms-expand {
   transform: translate(-31px, -80px);
 }
 
-.auth-robot[data-mood="cover"] .robot-arm-left,
-.auth-robot[data-mood="peek"] .robot-arm-left {
+.auth-robot[data-mood="cover"] .robot-arm-left {
   transform: rotate(-152deg) scaleY(2.9);
 }
 
@@ -11884,9 +11885,13 @@ select:not([multiple]):not([size])::-ms-expand {
   animation: robot-note 1.6s ease-out 0.8s infinite;
 }
 
-/* Password revealed: the left hand lifts a little and that eye peeks down at the field. */
+/* Password revealed: the left hand slides down beside the cheek so that eye can peek at the field. */
 .auth-robot[data-mood="peek"] .robot-hand-left {
-  transform: translate(14px, -100px) rotate(-18deg);
+  transform: translate(13px, -62px) rotate(-28deg);
+}
+
+.auth-robot[data-mood="peek"] .robot-arm-left {
+  transform: rotate(-164deg) scaleY(1.75);
 }
 
 .auth-robot[data-mood="peek"] .robot-eye-right .robot-lid {
