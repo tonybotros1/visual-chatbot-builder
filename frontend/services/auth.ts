@@ -19,6 +19,16 @@ export async function register(name: string, email: string, password: string) {
   return response;
 }
 
+/** Whether this server lets visitors create their own account (false on the hosted server). */
+export async function registrationOpen(): Promise<boolean> {
+  try {
+    const options = await apiFetch<{ registration_open: boolean }>("/auth/options");
+    return options.registration_open !== false;
+  } catch {
+    return true;
+  }
+}
+
 export function logout() {
   clearToken();
 }

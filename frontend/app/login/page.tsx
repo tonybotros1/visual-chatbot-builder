@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { login } from "@/services/auth";
+import { login, registrationOpen } from "@/services/auth";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { LoginRobot, type RobotMood } from "@/components/brand/LoginRobot";
+import { withBase } from "@/services/paths";
 
 type Field = "email" | "password" | null;
 
@@ -35,6 +36,9 @@ export default function LoginPage() {
   const [lookX, setLookX] = useState(-1);
   const reactionTimer = useRef<number | null>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
+  const [canRegister, setCanRegister] = useState(false);
+
+  useEffect(() => { void registrationOpen().then(setCanRegister); }, []);
 
   useEffect(() => () => { if (reactionTimer.current) window.clearTimeout(reactionTimer.current); }, []);
 
@@ -82,7 +86,7 @@ export default function LoginPage() {
               <SpaghettiMark size={34} />
               <span>Spaghetti</span>
             </div>
-            <img className="auth-partner-logo" src="/manzil-logo.png" alt="Manzil Healthcare Services" width={1703} height={707} />
+            <img className="auth-partner-logo" src={withBase("/manzil-logo.png")} alt="Manzil Healthcare Services" width={1703} height={707} />
           </div>
           <h1>Welcome back</h1>
           <p>Sign in to build, publish, and review your flows.</p>
@@ -152,10 +156,16 @@ export default function LoginPage() {
           {busy ? "Signing in..." : "Sign in"}
         </button>
 
-        <footer className="auth-footer">
-          <span>New to Spaghetti?</span>
-          <Link href="/register">Create an account</Link>
-        </footer>
+        {canRegister ? (
+          <footer className="auth-footer">
+            <span>New to Spaghetti?</span>
+            <Link href="/register">Create an account</Link>
+          </footer>
+        ) : (
+          <footer className="auth-footer">
+            <span>Need an account? Ask your administrator.</span>
+          </footer>
+        )}
       </form>
     </main>
   );

@@ -7,8 +7,12 @@ const extraDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .map((value) => value.trim())
   .filter(Boolean);
 
+// Serving under a sub-path (https://host/spaghetti): set NEXT_PUBLIC_BASE_PATH=/spaghetti at build time.
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  ...(basePath ? { basePath } : {}),
   // The dev server is what the team (and chat visitors on the LAN) see; hide the floating "N" dev badge.
   devIndicators: false,
   allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.*.*", "10.*.*.*", "172.*.*.*", "*.local", ...extraDevOrigins],

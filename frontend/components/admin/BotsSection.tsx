@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/services/paths";
 import { useCallback, useEffect, useState } from "react";
 import { Archive, ArrowRightLeft, ExternalLink, RotateCcw, Search, SquarePen } from "lucide-react";
 import { Select } from "@/components/ui/Select";
@@ -98,8 +99,8 @@ export function BotsSection() {
                 <td>{bot.deployment_count}</td>
                 <td>{new Date(bot.updated_at).toLocaleDateString()}</td>
                 <td className="row-actions">
-                  {bot.status === "published" ? <a className="icon-button" title="Open public chat" href={`/chat/${bot.slug}`} target="_blank" rel="noreferrer"><ExternalLink size={15} /></a> : null}
-                  <a className="icon-button" title="Open in builder" href={`/bots/${bot.id}/builder`}><SquarePen size={15} /></a>
+                  {bot.status === "published" ? <a className="icon-button" title="Open public chat" href={withBase(`/chat/${bot.slug}`)} target="_blank" rel="noreferrer"><ExternalLink size={15} /></a> : null}
+                  <a className="icon-button" title="Open in builder" href={withBase(`/bots/${bot.id}/builder`)}><SquarePen size={15} /></a>
                   <button type="button" className="icon-button" title="Transfer to another account" onClick={() => void transfer(bot)}><ArrowRightLeft size={15} /></button>
                   {bot.status === "archived"
                     ? <button type="button" className="icon-button" title="Restore" onClick={() => void restore(bot)}><RotateCcw size={15} /></button>

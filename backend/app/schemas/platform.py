@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -21,15 +22,26 @@ class AccessUpdate(BaseModel):
     bot_sharing: BotSharing
 
 
+_APP_ROUTE = re.compile(r"(^|/)(chat|r|bots|dashboard|login|register|admin|api)(/|$)")
+
+
 def normalize_public_url(value: str) -> str:
-    """An origin such as http://192.168.40.86:3000 (scheme + host[:port]); empty means "follow the page address"."""
+    """Where the app is reached: an origin (http://192.168.40.86:3000) or an origin plus the sub-path it is
+    hosted under (https://example.com/spaghetti). Empty means "follow the page address"."""
     value = value.strip().rstrip("/")
     if not value:
         return ""
+    message = "Enter an address like http://192.168.40.86:3000, https://bots.example.com or https://example.com/spaghetti"
     parsed = urlparse(value if "://" in value else f"http://{value}")
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
-        raise ValueError("Enter an address like http://192.168.40.86:3000 or https://bots.example.com")
-    return f"{parsed.scheme}://{parsed.netloc}"
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment:
+        raise ValueError(message)
+    base = parsed.path.rstrip("/")
+    if base:
+        host = (parsed.hostname or "")
+        # A pasted page link (…/chat/my-bot, …/bots/…/builder) is not the app's address.
+        if _APP_ROUTE.search(base) or ("." not in host and host != "localhost"):
+            raise ValueError(message)
+    return f"{parsed.scheme}://{parsed.netloc}{base}"
 
 
 class SiteRead(BaseModel):

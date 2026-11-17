@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { register } from "@/services/auth";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
+import { withBase } from "@/services/paths";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function RegisterPage() {
               <SpaghettiMark size={34} />
               <span>Spaghetti</span>
             </div>
-            <img className="auth-partner-logo" src="/manzil-logo.png" alt="Manzil Healthcare Services" width={1703} height={707} />
+            <img className="auth-partner-logo" src={withBase("/manzil-logo.png")} alt="Manzil Healthcare Services" width={1703} height={707} />
           </div>
           <h1>Create your account</h1>
           <p>Start building conversational flows in minutes.</p>

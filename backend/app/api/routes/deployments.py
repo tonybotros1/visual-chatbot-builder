@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.api.routes.bots import owned_bot
+from app.api.routes.platform import public_site_url
 from app.api.routes.conversations import _start
 from app.config import get_settings
 from app.database.session import get_db
@@ -521,7 +522,8 @@ def bootstrap(
         reasons=reasons,
         deployment_key=deployment.deployment_key,
         mode=deployment.mode,
-        config=deployment.config,
+        # The chat iframe opens on the platform's public address unless the deployment names its own.
+        config={**({"frontend_url": public_site_url(db)} if public_site_url(db) else {}), **(deployment.config or {})},
         widget=_widget_config(version.flow_json, bot.name),
         bot_slug=bot.slug if eligible else None,
         version_number=version.version_number if eligible else None,
@@ -580,7 +582,7 @@ def deployment_start(
 @public_router.get("/deployments/{deployment_key}/embed.js")
 def embed_script(deployment_key: str, request: Request, db: Annotated[Session, Depends(get_db)]) -> Response:
     deployment, bot, version = _public_deployment(deployment_key, db)
-    frontend_base = str(deployment.config.get("frontend_url") or "http://localhost:3000").rstrip("/")
+    frontend_base = str(deployment.config.get("frontend_url") or public_site_url(db) or "http://localhost:3000").rstrip("/")
     chat_url = f"{frontend_base}/chat/{bot.slug}?deployment={deployment.deployment_key}"
     api_base = str(request.base_url).rstrip("/")
     title = str(deployment.config.get("launcher_label") or "Chat")

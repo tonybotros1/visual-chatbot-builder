@@ -37,6 +37,7 @@ import { NodePalette } from "@/components/sidebar/NodePalette";
 import { loadFlow, saveFlow } from "@/services/flows";
 import { getBot, publishBot, validateBot } from "@/services/bots";
 import { useFlowStore } from "@/stores/flow-store";
+import { withBase } from "@/services/paths";
 import type { BotRecord, ValidationIssue } from "@/types/api";
 import type { BuilderNodeType, FlowDocument } from "@/types/flow";
 import { FlowCanvas } from "./FlowCanvas";
@@ -348,7 +349,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
       const result = await publishBot(botId);
       setMessage(`Published version ${result.version.version_number}`);
       setSaveState("saved");
-      window.open(result.public_url, "_blank", "noopener,noreferrer");
+      window.open(result.public_url.startsWith("/") ? withBase(result.public_url) : result.public_url, "_blank", "noopener,noreferrer");
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Publish failed");
       setSaveState("error");

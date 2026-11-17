@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties } from "react";
 import { ImagePlus, MessageCircle, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
+import { withBase } from "@/services/paths";
 import { darkenHex, defaultFlowAppearance, useFlowStore } from "@/stores/flow-store";
 import type { FlowAppearance, PageLink } from "@/types/flow";
 
@@ -110,7 +111,7 @@ const presetDataUrls = new Map<string, string>();
 async function presetDataUrl(id: string): Promise<string> {
   const cached = presetDataUrls.get(id);
   if (cached) return cached;
-  const response = await fetch(`/avatars/${id}.svg`);
+  const response = await fetch(withBase(`/avatars/${id}.svg`));
   if (!response.ok) throw new Error("preset unavailable");
   const text = await response.text();
   const dataUrl = `data:image/svg+xml;base64,${window.btoa(unescape(encodeURIComponent(text)))}`;
@@ -153,7 +154,7 @@ function AvatarPresets({ current, onPick }: { current: string; onPick: (dataUrl:
             aria-pressed={active === preset.id}
             onClick={() => void presetDataUrl(preset.id).then(onPick).catch(() => undefined)}
           >
-            <img src={`/avatars/${preset.id}.svg`} alt="" />
+            <img src={withBase(`/avatars/${preset.id}.svg`)} alt="" />
           </button>
         ))}
       </div>

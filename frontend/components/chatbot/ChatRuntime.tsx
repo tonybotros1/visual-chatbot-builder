@@ -6,6 +6,7 @@ import { ExternalLink, RefreshCw, Send, Star } from "lucide-react";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { RichText } from "@/components/content/RichText";
 import { LinkIcon } from "@/components/chatbot/LinkIcon";
+import { stripBase, withBase } from "@/services/paths";
 import { getRuntimeStrings } from "./runtime-strings";
 import { DatePicker } from "./DatePicker";
 import { answerConversation, deploymentBootstrap, startDeployment, startPreview, startPublic } from "@/services/conversations";
@@ -87,7 +88,7 @@ export function ChatRuntime({ botId, identifier, deploymentKey, eligibilityToken
     } catch (caught) {
       if (botId && caught && typeof caught === "object" && "status" in caught && (caught as { status?: number }).status === 401) {
         // The builder preview is for signed-in builders; the session lives per address, so a new address means signing in again.
-        window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        window.location.assign(withBase(`/login?next=${encodeURIComponent(stripBase(window.location.pathname) + window.location.search)}`));
         return;
       }
       if (sequence === responseSequence.current) {

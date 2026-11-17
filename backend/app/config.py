@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     super_admin_name: str = "Platform admin"
     # Seeds the sample "Eligibility demo" bot and "Consent decision" subflow under the super admin.
     seed_demo_data: bool = True
+    # Self-service sign-up. Turn off on an internet-facing server: accounts are then created by an
+    # admin in the admin console (Users), so strangers cannot join and see shared bots.
+    allow_registration: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

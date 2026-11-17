@@ -1,0 +1,118 @@
+# Production stack for an internet-facing server behind a reverse proxy (Caddy on the shared "web" network).
+#
+#   https://<host><BASE_PATH>/api/*  ->  spaghetti-api:8000   (proxy strips BASE_PATH, keeps /api)
+#   https://<host><BASE_PATH>/*      ->  spaghetti-web:3000   (prefix kept: Next.js serves under its basePath)
+#
+# BASE_PATH is empty when the app owns the whole host, or a sub-path such as /spaghetti; PUBLIC_URL is the
+# full address including that path.
+#
+# Nothing is published on the host: only the proxy can reach the containers, and Postgres stays on the
+# private network. Settings and secrets come from the .env file next to this file (see .env.production.example).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+name: spaghetti
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL}/api
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_URL}
+        NEXT_PUBLIC_BASE_PATH: ${BASE_PATH:-}
+    image: spaghetti-web:latest
+    container_name: spaghetti-web
+    restart: unless-stopped
+    networks: [web]
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    build:
+      context: ./backend
+    image: spaghetti-api:latest
+    container_name: spaghetti-api
+    restart: unless-stopped
+    # Behind the proxy: trust its X-Forwarded-* headers so URLs are https and the visitor address is real.
+    # --root-path makes the URLs the API hands out (widget script, start endpoints) include the sub-path.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*' --root-path '${BASE_PATH:-}'"
+    environment: &backend-env
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CORS_ORIGINS: '["${PUBLIC_ORIGIN:-${PUBLIC_URL}}"]'
+      # Websites that embed the widget call /api/public from their own origin. Sign-in uses a bearer
+      # token (never cookies), so answering any origin does not expose a signed-in session.
+      CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-^https?://.*$}
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-720}
+      UPLOAD_DIRECTORY: data/uploads
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-25}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME:-}
+      AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY:-}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-spaghetti-uploads}
+      AZURE_STORAGE_ENDPOINT_SUFFIX: ${AZURE_STORAGE_ENDPOINT_SUFFIX:-core.windows.net}
+      PUBLIC_RATE_LIMIT_PER_MINUTE: ${PUBLIC_RATE_LIMIT_PER_MINUTE:-120}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
+      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Platform admin}
+      SEED_DEMO_DATA: "false"
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+    volumes:
+      - uploads:/app/data/uploads
+    networks: [web, internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    logging: *logging
+
+  integration-worker:
+    image: spaghetti-api:latest
+    container_name: spaghetti-worker
+    restart: unless-stopped
+    command: python -m app.workers.delivery_worker
+    environment: *backend-env
+    networks: [internal]
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+  postgres:
+    image: postgres:18.6-alpine
+    container_name: spaghetti-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+networks:
+  web:
+    external: true
+  internal:
+
+volumes:
+  postgres_data:
+  uploads:

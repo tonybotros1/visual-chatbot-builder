@@ -7,7 +7,8 @@ def test_public_url_is_reduced_to_an_origin() -> None:
     assert normalize_public_url("http://192.168.40.86:3000/") == "http://192.168.40.86:3000"
     assert normalize_public_url("bots.example.com") == "http://bots.example.com"
     assert normalize_public_url("  ") == ""
-    for bad in ("http://host/path", "ftp://host", "http://host?x=1"):
+    assert normalize_public_url("https://ysman.dyndns.info/spaghetti/") == "https://ysman.dyndns.info/spaghetti"
+    for bad in ("http://host/path", "ftp://host", "http://host?x=1", "https://bots.example.com/chat/my-bot", "https://bots.example.com/spaghetti/bots/1/builder"):
         with pytest.raises(ValueError):
             normalize_public_url(bad)
     with pytest.raises(ValueError):

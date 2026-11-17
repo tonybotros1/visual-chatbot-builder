@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.config import get_settings
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserRead
@@ -16,6 +17,8 @@ router = APIRouter()
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Annotated[Session, Depends(get_db)]) -> TokenResponse:
+    if not get_settings().allow_registration:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign-up is closed on this server. Ask an administrator to create your account.")
     email = payload.email.lower()
     existing = db.scalar(select(User).where(func.lower(User.email) == email))
     if existing:
@@ -35,6 +38,12 @@ def login(payload: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> Tok
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is disabled")
     return TokenResponse(access_token=create_access_token(user.id), user=UserRead.model_validate(user))
+
+
+@router.get("/options")
+def auth_options() -> dict[str, bool]:
+    """Public: what the sign-in screen may offer."""
+    return {"registration_open": get_settings().allow_registration}
 
 
 @router.get("/me", response_model=UserRead)
