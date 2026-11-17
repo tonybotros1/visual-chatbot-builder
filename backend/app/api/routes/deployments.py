@@ -37,6 +37,7 @@ from app.schemas.deployment import (
     CustomDomainCreate,
     CustomDomainRead,
 )
+from app.services.custom_domains import platform_host, points_here
 from app.services.integrations import _ensure_public_destination
 from app.security import ALGORITHM
 
@@ -388,6 +389,7 @@ def list_domains(bot_id: UUID, user: Annotated[User, Depends(get_current_user)],
 def create_domain(deployment_id: UUID, payload: CustomDomainCreate, user: Annotated[User, Depends(get_current_user)], db: Annotated[Session, Depends(get_db)]) -> CustomDomain:
     _owned_deployment(deployment_id, user, db, "admin")
     hostname = _normalize_hostname(payload.hostname)
+    if hostname == platform_host(public_site_url(db)): raise HTTPException(status_code=422, detail="That is this platform's own address. Enter the domain you want the chatbot to answer on.")
     if db.scalar(select(CustomDomain.id).where(CustomDomain.hostname == hostname)): raise HTTPException(status_code=409, detail="This hostname is already registered")
     item = CustomDomain(deployment_id=deployment_id, hostname=hostname, verification_token=secrets.token_urlsafe(32))
     db.add(item); db.commit(); db.refresh(item); return item
@@ -398,13 +400,23 @@ def verify_domain(domain_id: UUID, user: Annotated[User, Depends(get_current_use
     item = db.get(CustomDomain, domain_id)
     if item is None: raise HTTPException(status_code=404, detail="Custom domain not found")
     _owned_deployment(item.deployment_id, user, db, "admin")
-    url = f"https://{item.hostname}/.well-known/visual-chatbot-builder-verification"
-    try:
-        _ensure_public_destination(url)
-        with urlopen(UrlRequest(url, headers={"User-Agent": "VisualChatbotBuilder/2"}), timeout=10) as response:
-            value = response.read(500).decode().strip()
-    except (ValueError, HTTPError, URLError, OSError, TimeoutError) as exc: raise HTTPException(status_code=422, detail=f"Domain verification failed: {exc}") from exc
-    if value != item.verification_token: raise HTTPException(status_code=422, detail="Verification file did not contain the expected token")
+    # Ownership is shown by pointing the domain here: once its DNS resolves to this server's address,
+    # only someone who controls the domain could have done that. No file to upload.
+    site = public_site_url(db)
+    if not points_here(item.hostname, site):
+        # Fallback for setups with another proxy in front: the token served at the well-known address.
+        url = f"https://{item.hostname}/.well-known/visual-chatbot-builder-verification"
+        target = platform_host(site)
+        hint = (
+            f"{item.hostname} does not point to this server yet. Add a CNAME record for it with the value {target}, wait a few minutes for DNS to update, then press Verify again."
+            if target else f"{item.hostname} does not point to this server yet. Point its DNS at this server, then press Verify again."
+        )
+        try:
+            _ensure_public_destination(url)
+            with urlopen(UrlRequest(url, headers={"User-Agent": "VisualChatbotBuilder/2"}), timeout=10) as response:
+                value = response.read(500).decode().strip()
+        except (ValueError, HTTPError, URLError, OSError, TimeoutError) as exc: raise HTTPException(status_code=422, detail=hint) from exc
+        if value != item.verification_token: raise HTTPException(status_code=422, detail=hint)
     item.status = "verified"; item.verified_at = datetime.now(UTC); db.commit(); db.refresh(item); return item
 
 

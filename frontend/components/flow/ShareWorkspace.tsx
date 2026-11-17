@@ -181,7 +181,7 @@ export function ShareWorkspace({ botId }: { botId: string }) {
     try {
       const updated = await verifyDomain(id);
       setDomains((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-      if (updated.status !== "verified") setDomainError("Not verified yet. Make sure the verification file is reachable, then check again.");
+      if (updated.status !== "verified") setDomainError("Not verified yet. Check the DNS record, wait a few minutes, then press Verify again.");
     } catch (caught) {
       setDomainError(caught instanceof Error ? caught.message : "Verification failed");
     } finally {
@@ -202,7 +202,16 @@ export function ShareWorkspace({ botId }: { botId: string }) {
     }
   };
   // The short link opens /r/<code>, which resolves to the published bot (and its active Link deployment).
-  const shortLink = bot?.share_code && siteBase ? `${verifiedDomain ? `https://${verifiedDomain.hostname}` : siteBase}/r/${bot.share_code}` : "";
+  // A verified custom domain opens this bot at its root, so the domain itself is the link.
+  const shortLink = verifiedDomain ? `https://${verifiedDomain.hostname}` : bot?.share_code && siteBase ? `${siteBase}/r/${bot.share_code}` : "";
+  // What the DNS record must point to: this platform's own hostname.
+  const cnameTarget = (() => {
+    try {
+      return siteBase ? new URL(siteBase).hostname : "";
+    } catch {
+      return "";
+    }
+  })();
   const linkPreviewAvatar = appearance.avatar_url ? <img src={appearance.avatar_url} alt="" /> : <MessageCircle size={14} />;
 
   const copyValue = async (value: string, key: string) => {
@@ -298,13 +307,23 @@ export function ShareWorkspace({ botId }: { botId: string }) {
                     </div>
                     {shareDomain.status !== "verified" ? (
                       <div className="share-domain-steps">
-                        <p>To prove you own <strong>{shareDomain.hostname}</strong>, make this address return the token below, then press Verify:</p>
-                        <code>https://{shareDomain.hostname}/.well-known/visual-chatbot-builder-verification</code>
-                        <div className="share-domain-token"><code>{shareDomain.verification_token}</code><button type="button" className="share-social-button" aria-label="Copy verification token" onClick={() => void copyValue(shareDomain.verification_token, "domain-token")}>{copied === "domain-token" ? <Check size={15} /> : <Copy size={15} />}</button></div>
-                        <p>Then point the domain at this server (a CNAME or A record) so visitors land on the chat page.</p>
+                        <p><strong>1.</strong> At your domain provider, add this DNS record for <strong>{shareDomain.hostname}</strong>:</p>
+                        <dl className="share-dns-record">
+                          <div><dt>Type</dt><dd>CNAME</dd></div>
+                          <div><dt>Name</dt><dd>{shareDomain.hostname.split(".")[0]}</dd></div>
+                          <div>
+                            <dt>Value</dt>
+                            <dd className="share-domain-token">
+                              <code>{cnameTarget || "this server's address"}</code>
+                              {cnameTarget ? <button type="button" className="share-social-button" aria-label="Copy the record value" onClick={() => void copyValue(cnameTarget, "domain-target")}>{copied === "domain-target" ? <Check size={15} /> : <Copy size={15} />}</button> : null}
+                            </dd>
+                          </div>
+                        </dl>
+                        <p><strong>2.</strong> Wait a few minutes for the record to take effect, then press <strong>Verify</strong>.</p>
+                        <p><strong>3.</strong> Open <code>https://{shareDomain.hostname}</code>. The first visit can take a few seconds while the secure certificate is issued.</p>
                       </div>
                     ) : (
-                      <p className="share-inline-note"><Info size={14} /> Your short link now uses this domain: <code>{shortLink}</code></p>
+                      <p className="share-inline-note"><Info size={14} /> Visitors can open this bot at <code>https://{shareDomain.hostname}</code>. Your share link above now uses this domain.</p>
                     )}
                   </>
                 ) : (
