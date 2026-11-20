@@ -544,6 +544,8 @@ type FlowState = {
   /** A copy of the node placed just below-right of the original, selected and ready to edit. */
   duplicateNode: (nodeId: string) => void;
   removeEdge: (edgeId: string) => void;
+  /** Swap the whole flow for another one (the Code tab's Build). Design and settings stay; one undo step. */
+  replaceGraph: (document: Pick<FlowDocument, "nodes" | "edges">) => void;
   undo: () => void;
   redo: () => void;
   updateNodeData: (nodeId: string, updates: Partial<BuilderNodeData>) => void;
@@ -729,6 +731,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set((state) => {
       if (!state.edges.some((edge) => edge.id === edgeId)) return state;
       return { ...remember(state), edges: state.edges.filter((edge) => edge.id !== edgeId), isDirty: true };
+    }),
+
+  replaceGraph: (document) =>
+    set((state) => {
+      const nodes = cleanNodes(document.nodes);
+      const edges = cleanEdges(nodes, document.edges).map((edge) => ({ ...edge, ...edgeDefaults }));
+      return {
+        ...remember(state),
+        nodes: autoLayoutNodes(nodes, edges),
+        edges,
+        selectedNodeId: null,
+        collapsedNodeIds: [],
+        treeOffsets: {},
+        // The canvas fits the view to the new flow when the revision changes.
+        layoutRevision: state.layoutRevision + 1,
+        isDirty: true,
+      };
     }),
 
   undo: () =>

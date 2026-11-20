@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
   ChevronRight,
+  Code2,
   Home,
   CheckCircle2,
   Eye,
@@ -31,6 +32,7 @@ import {
   Share2,
   Settings2,
 } from "lucide-react";
+import { CodeWorkspace } from "@/components/flow/CodeWorkspace";
 import { PropertiesPanel } from "@/components/properties/PropertiesPanel";
 import { SpaghettiMark } from "@/components/brand/SpaghettiMark";
 import { NodePalette } from "@/components/sidebar/NodePalette";
@@ -182,13 +184,13 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
   const [bot, setBot] = useState<BotRecord | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
-  const [activeTab, setActiveTab] = useState<"questions" | "design" | "share" | "settings">("questions");
+  const [activeTab, setActiveTab] = useState<"questions" | "design" | "code" | "share" | "settings">("questions");
 
   // Other builder pages (for example Share → "Customize") can ask for a tab by dispatching this event.
   useEffect(() => {
     const onOpenTab = (event: Event) => {
       const tab = (event as CustomEvent<string>).detail;
-      if (tab === "questions" || tab === "design" || tab === "share" || tab === "settings") setActiveTab(tab);
+      if (tab === "questions" || tab === "design" || tab === "code" || tab === "share" || tab === "settings") setActiveTab(tab);
     };
     window.addEventListener("spaghetti:open-tab", onOpenTab);
     return () => window.removeEventListener("spaghetti:open-tab", onOpenTab);
@@ -368,7 +370,7 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
 
   return (
     <main
-      className={`builder-page${activeTab === "design" ? " is-design-mode" : activeTab === "share" ? " is-share-mode" : activeTab === "settings" ? " is-settings-mode" : ""}`}
+      className={`builder-page${activeTab === "design" ? " is-design-mode" : activeTab === "share" ? " is-share-mode" : activeTab === "settings" ? " is-settings-mode" : activeTab === "code" ? " is-settings-mode is-code-mode" : ""}`}
       style={{
         "--builder-canvas-color": "#FFFFFF",
         "--builder-node-color": appearance.surface_color,
@@ -506,6 +508,16 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
           <Palette size={16} /> Design
         </button>
         <button
+          className={activeTab === "code" ? "is-active" : ""}
+          type="button"
+          onClick={() => {
+            selectNode(null);
+            setActiveTab("code");
+          }}
+        >
+          <Code2 size={16} /> Code
+        </button>
+        <button
           className={activeTab === "share" ? "is-active" : ""}
           type="button"
           onClick={() => {
@@ -554,6 +566,16 @@ export function BuilderWorkspace({ botId }: { botId: string }) {
         </div>
       ) : activeTab === "design" ? (
         <DesignWorkspace />
+      ) : activeTab === "code" ? (
+        <CodeWorkspace
+          botId={botId}
+          botName={bot?.name ?? ""}
+          onBuilt={(summary) => {
+            setValidationIssues([]);
+            setActiveTab("questions");
+            setMessage(summary);
+          }}
+        />
       ) : activeTab === "share" ? (
         <ShareWorkspace botId={botId} />
       ) : (

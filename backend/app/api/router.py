@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import admin, auth, bots, branding, conversations, custom_domains, platform, short_links, deployments, flows, health, integrations, localization, logic, providers, quality, subflows, teams, workspaces
+from app.api.routes import admin, auth, bot_script, bots, branding, conversations, custom_domains, platform, short_links, deployments, flows, health, integrations, localization, logic, providers, quality, subflows, teams, workspaces
 
 
 api_router = APIRouter()
@@ -9,6 +9,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(bots.router, prefix="/bots", tags=["bots"])
 api_router.include_router(workspaces.router, prefix="/workspaces", tags=["workspaces"])
+api_router.include_router(bot_script.router, prefix="/bot-script", tags=["bot-script"])
 api_router.include_router(branding.router, prefix="/branding", tags=["branding"])
 api_router.include_router(platform.router, prefix="/platform", tags=["platform"])
 api_router.include_router(flows.router, prefix="/bots", tags=["flows"])

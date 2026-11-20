@@ -1,0 +1,165 @@
+bot: THABIT Physician Participation
+languages: en, ar
+
+# 01 Welcome (shown once, in both languages) and the language question
+[welcome] message
+en: Welcome to THABIT, the Myasthenia Gravis (MG) Patient Support Program for patients prescribed RYSTIGGO®. THABIT is sponsored by NewBridge and operated by MHCS Medical Company in the Kingdom of Saudi Arabia. The program is designed to support eligible patients throughout their treatment journey. All program services are provided free of charge.
+ar: مرحبًا بك في برنامج «ثابت» لدعم مرضى الوهن العضلي الوبيل الموصوف لهم دواء ريستيغو®. برنامج «ثابت» برعاية شركة نيوبريدج ويُدار من قِبل شركة إم إتش سي إس الطبية في المملكة العربية السعودية، وقد صُمم لدعم المرضى المستوفين لمعايير الأهلية طوال رحلتهم العلاجية. جميع خدمات البرنامج مجانية.
+
+[language] language
+en: Please select your preferred language.
+ar: يرجى اختيار اللغة المفضلة.
+
+# 02 About THABIT and patient eligibility
+[about] message
+en: THABIT supports eligible adult patients diagnosed with generalized Myasthenia Gravis (gMG) who have been prescribed RYSTIGGO® by their treating physician.
+
+Eligible patients must meet the following criteria:
+* Adult aged 18 years or older.
+* Confirmed diagnosis of generalized Myasthenia Gravis (gMG).
+* Confirmed positive AChR-Ab or MuSK-Ab.
+* RYSTIGGO® prescribed by the treating physician.
+ar: يدعم برنامج «ثابت» المرضى البالغين المستوفين لمعايير الأهلية والمصابين بالوهن العضلي الوبيل المعمم (gMG) والموصوف لهم دواء ريستيغو® من قِبل الطبيب المعالج.
+
+يجب أن يستوفي المريض معايير الأهلية التالية:
+* أن يكون عمر المريض 18 عامًا أو أكثر.
+* وجود تشخيص مؤكد بالوهن العضلي الوبيل المعمم (gMG).
+* تأكيد إيجابية AChR-Ab أو MuSK-Ab.
+* أن يكون دواء ريستيغو® موصوفًا للمريض من قِبل الطبيب المعالج.
+
+# 03 How THABIT supports the patient
+[support] message
+en: Through THABIT, eligible patients receive coordinated support throughout their treatment journey, while relevant updates are shared with the treating physician.
+* Home administration of RYSTIGGO® once weekly for six consecutive weeks during each prescribed treatment cycle, with coordination of scheduled home visits.
+* Patient education about the treatment and the program, with ongoing follow-up and support throughout participation in THABIT.
+* MG-ADL assessments during treatment and every two weeks during the treatment-free Off Period, as applicable, with follow-up of the patient’s progress and relevant updates shared with the treating physician.
+* Coordination of medication collection from the hospital and delivery to the patient’s home, upon patient request and subject to treatment-center approval.
+ar: من خلال برنامج «ثابت»، يحصل المرضى المستوفون لمعايير الأهلية على دعم متكامل طوال رحلتهم العلاجية، مع إطلاع الطبيب المعالج على المستجدات ذات الصلة.
+* إعطاء دواء ريستيغو® في المنزل مرة أسبوعيًا لمدة ستة أسابيع متتالية خلال كل دورة علاجية يصفها الطبيب، مع تنسيق مواعيد الزيارات المنزلية.
+* تقديم التثقيف للمريض حول العلاج والبرنامج، مع المتابعة والدعم المستمر طوال فترة مشاركته في برنامج «ثابت».
+* إجراء تقييمات MG-ADL أثناء دورة العلاج وكل أسبوعين خلال فترة التوقف عن العلاج، حسب ما ينطبق، مع متابعة تطور حالة المريض وإطلاع الطبيب المعالج على المستجدات ذات الصلة.
+* تنسيق استلام الدواء من المستشفى وتوصيله إلى منزل المريض، بناءً على طلبه وبعد موافقة مركز العلاج.
+
+# 04 Patient referral
+[referral] choice
+save: referral_choice
+en: Would you like to refer an eligible patient to THABIT so they can benefit from this support?
+ar: هل ترغب في تحويل مريض مستوفٍ لمعايير الأهلية إلى برنامج «ثابت» للاستفادة من هذه الخدمات؟
+- Yes, proceed | نعم، متابعة -> consent_intro
+- I need more information | أحتاج إلى مزيد من المعلومات -> more_info
+- Not now | ليس الآن -> not_now
+
+# Option 1: I need more information
+[more_info] choice
+save: contact_request
+en: Would you like a THABIT Program representative to contact you and provide further information?
+ar: هل ترغب في أن يتواصل معك أحد ممثلي برنامج «ثابت» لتزويدك بمزيد من المعلومات؟
+- Yes, contact me | نعم، تواصلوا معي -> contact_intro
+- Not now | ليس الآن -> not_now
+
+[contact_intro] message
+en: If you select “Yes, contact me”, please provide the following information:
+ar: في حال اختيار «نعم، تواصلوا معي»، يرجى تزويدنا بالبيانات التالية:
+
+[contact_name] text
+save: physician_name
+en: Enter your full name.
+ar: أدخل اسمك الكامل.
+
+[contact_specialty] text
+save: specialty
+en: Enter your specialty.
+ar: أدخل تخصصك.
+
+[contact_hospital] text
+save: hospital
+en: Enter your hospital or medical center.
+ar: أدخل اسم المستشفى أو المركز الطبي.
+
+[contact_mobile] phone
+save: mobile
+en: Enter your mobile number.
+ar: أدخل رقم هاتفك المتحرك.
+
+[contact_email] email
+save: email
+required: no
+en: Enter your professional email address, if available.
+ar: أدخل بريدك الإلكتروني المهني، إن وجد.
+
+[contact_done] end
+en: Thank you. Your request has been received. A THABIT Program representative will contact you using the information provided.
+ar: شكرًا لك. تم استلام طلبك، وسيتواصل معك أحد ممثلي برنامج «ثابت» باستخدام بيانات التواصل التي قدمتها.
+
+# If "Not now" is selected
+[not_now] end
+en: Thank you for your interest in THABIT. You may contact the THABIT Program Team at any time if you require further information or wish to refer a patient at a later stage.
+ar: شكرًا لاهتمامك ببرنامج «ثابت». يمكنك التواصل مع فريق البرنامج في أي وقت إذا كنت بحاجة إلى مزيد من المعلومات أو رغبت في تحويل مريض في وقت لاحق.
+
+# Option 2: Yes, proceed
+[consent_intro] choice
+save: consent_review
+en: To refer eligible patients to THABIT, please review and complete the Physician Participation & Consent Form.
+ar: لتحويل المرضى المستوفين لمعايير الأهلية إلى برنامج «ثابت»، يرجى مراجعة واستكمال نموذج مشاركة وموافقة الطبيب.
+- Review and Continue | مراجعة ومتابعة
+
+[details_intro] message
+en: THABIT Patient Support Program — Physician Participation & Consent Form
+ar: برنامج «ثابت» لدعم المرضى — نموذج مشاركة وموافقة الطبيب
+
+[physician_name] text
+save: physician_name
+en: Enter your full name.
+ar: أدخل اسمك الكامل.
+
+[specialty] text
+save: specialty
+en: Enter your specialty.
+ar: أدخل تخصصك.
+
+[hospital] text
+save: hospital
+en: Enter your hospital or medical center.
+ar: أدخل اسم المستشفى أو المركز الطبي.
+
+[email] email
+save: email
+en: Enter your professional email address.
+ar: أدخل بريدك الإلكتروني المهني.
+
+[mobile] phone
+save: mobile
+en: Enter your mobile number.
+ar: أدخل رقم هاتفك المتحرك.
+
+[city] text
+save: city
+en: Enter your city.
+ar: أدخل المدينة.
+
+[consent_review] choice
+save: consent_opened
+en: Please review the Physician Participation & Consent Form before signing.
+ar: يرجى مراجعة نموذج مشاركة وموافقة الطبيب قبل التوقيع.
+- Continue to Consent Form | متابعة إلى نموذج الموافقة
+
+[signature] text
+save: signature
+en: Physician name: {{physician_name}}
+To sign, please type your full name.
+ar: اسم الطبيب: {{physician_name}}
+للتوقيع، يرجى كتابة اسمك الكامل.
+
+[submit] choice
+save: consent_submitted
+en: Please confirm to submit your Physician Participation & Consent Form.
+ar: يرجى التأكيد لإرسال نموذج مشاركة وموافقة الطبيب.
+- Submit | إرسال
+
+[done] end
+en: Thank you. Your Physician Participation & Consent Form has been successfully submitted. The THABIT Program Team will contact you if any additional information is required.
+
+Contact us through the available program channels:
+ar: شكرًا لك. تم إرسال نموذج مشاركة وموافقة الطبيب بنجاح. سيتواصل معك فريق برنامج «ثابت» إذا كانت هناك حاجة إلى أي معلومات إضافية.
+
+يمكنك التواصل معنا من خلال قنوات البرنامج المتاحة:
