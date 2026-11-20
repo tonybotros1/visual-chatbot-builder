@@ -1,0 +1,235 @@
+bot: VOXZOGO Patient Referral
+languages: en, ar
+
+# Sources:
+#   DM/BM/ACH/KSA/1.01/C  Patient Referral QR Code Tool - EN&AR (sections 1 to 9)
+#   DM/BM/ACH/KSA/1.01/A  Patient Consent Form - English
+#   DM/BM/ACH/KSA/1.01/B  Patient Consent Form - Arabic
+
+# 1. Welcome Message
+
+[welcome] message
+en: We're happy to support you on your treatment journey with VOXZOGO®.
+
+Achondroplasia Patient Support Program is operated by MHCS Medical Company and sponsored by BioMarin, and is designed to support you throughout your treatment journey. All Program services are free of charge.
+ar: مرحبًا بك في برنامج دعم مرضى الأكوندروبلازيا Achondroplasia
+
+يسعدنا أن نكون جزءًا من رحلتك العلاجية باستخدام دواء فوكسوغو®. يُشغَّل البرنامج من قِبل شركة إم إتش سي إس الطبية، وتتم رعايته من قِبل شركة بيومارين ويهدف إلى دعمك خلال رحلتك العلاجية — جميع خدمات البرنامج مجانية
+
+[language] language
+en: Please select your preferred language
+ar: يرجى اختيار اللغة المفضلة
+
+# 2. Program Enrolment Request
+
+[enrollment_request] choice
+save: enrollment_request
+en: Would you like to proceed with your Achondroplasia Patient Support Program enrollment request?
+ar: هل ترغب في متابعة طلب الإنضمام لبرنامج دعم مرضى الأكوندروبلازيا؟
+- Yes, proceed | نعم، تفضل بالمتابعة -> consent_introduction
+- I need more information | أنا بحاجة إلى مزيد من المعلومات -> program_information
+
+# OPTION 1: I Need More Information
+# 3. Program Information & Important Notice
+
+[program_information] message
+en: Before we begin, please note:
+* This chatbot does not provide medical advice.
+* In case of a medical emergency, contact your treating physician or emergency services immediately.
+* Calls and data are processed in line with MHCS Medical Company and BioMarin data privacy and personal data protection policy.
+
+Through this program, you'll receive:
+* Disease awareness and self-management education for Achondroplasia patients.
+* Treatment-specific education for VOXZOGO® patients: treatment expectations, adherence support, lifestyle and self-management.
+* Patient monitoring throughout the treatment cycle, with continuous assessment.
+* Regular follow-up calls to track your progress on the program.
+ar: في البداية، نود أن ننوّه إلى ما يلي:
+* هذه المحادثة لا تقدّم أي نصائح طبية.
+* في حال وجود حالة طارئة، يُرجى التواصل فورًا مع طبيبك المعالج أو خدمات الطوارئ.
+* جميع المكالمات والبيانات تُعالَج وفقًا لسياسة خصوصية البيانات الخاصة بشركة إم إتش سي إس الطبية وشركة بيومارين.
+
+من خلال هذا البرنامج ستتلقى:
+* التوعية بالمرض ودعم الإدارة الذاتية لمرضى الأكوندروبلازيا.
+* تثقيف علاجي مخصص لمرضى فوكسوغو®: توقعات العلاج، دعم الالتزام بالعلاج، نمط الحياة والإدارة الذاتية.
+* متابعة المريض طوال دورة العلاج مع تقييم مستمر.
+* مكالمات متابعة دورية لتتبع تقدمك في البرنامج.
+
+[representative_contact] choice
+save: representative_contact
+en: Would you like a program representative to contact you and provide further information?
+ar: هل ترغب في أن يتواصل معك أحد ممثلي البرنامج لتزويدك بمزيد من المعلومات؟
+- Yes, contact me | نعم، تواصل معي -> contact_full_name
+- Not now | ليس الآن -> not_now
+
+# 4. Contact Information
+# Only the e-mail is optional ("if available"). The lone "Continue" button is left out:
+# sending the last answer continues the chat.
+
+[contact_full_name] text
+save: full_name
+en: Please provide your full name
+ar: يرجى تزويدنا باسمك الكامل.
+
+[contact_mobile] phone
+save: mobile_number
+en: Please provide your mobile number
+ar: يرجى تزويدنا برقم هاتفك المتحرك.
+
+[contact_email] email
+save: email_address
+required: no
+en: Please provide your email address, if available
+ar: يرجى تزويدنا بعنوان بريدك الإلكتروني، إن وجد.
+
+# 5. Contact Request Confirmation
+# NOTE: Section 5 of the document leaves the support e-mail ("insert support email") and the hotline blank. The values below are the ones printed in section 9. Confirm they also apply here.
+
+[contact_confirmation] end
+en: Thank you. Your request has been received. A program representative will contact you using the information provided.
+
+Contact us for any questions or support:
+Email: a.shazly@mhcsmedical.com
+Hotline: +966 53 314 8139
+ar: شكرًا لك. تم استلام طلبك، وسيتواصل معك أحد ممثلي البرنامج باستخدام بيانات التواصل التي قدمتها.
+
+لأي استفسارات أو دعم، يرجى التواصل معنا:
+البريد الإلكتروني: a.shazly@mhcsmedical.com
+الخط الساخن: +966 53 314 8139
+
+# 6. If "Not Now" Is Selected
+
+[not_now] end
+en: Thank you for your interest in the Achondroplasia Patient Support Program (VOXZOGO®). You may contact the program team if you require further information or wish to submit a request at a later stage.
+ar: شكرًا لاهتمامك ببرنامج دعم مرضى الأكوندروبلازيا (فوكسوغو®). يمكنك التواصل مع فريق البرنامج إذا كنت بحاجة إلى مزيد من المعلومات أو رغبت في تقديم طلب في وقت لاحق.
+
+# OPTION 2: Yes, Proceed
+# 7. Patient Consent Form
+
+[consent_introduction] choice
+save: consent_review
+en: To submit your request for the Achondroplasia Patient Support Program (VOXZOGO®), please review and sign the Patient Consent Form by selecting the button below.
+
+Once the signed consent form has been received, the program team will contact you regarding the next steps.
+ar: لتقديم طلب الحصول على خدمات برنامج دعم مرضى الأكوندروبلازيا (فوكسوغو®)، يرجى مراجعة نموذج موافقة المريض وتوقيعه من خلال الضغط على الزر أدناه.
+
+بعد استلام نموذج الموافقة الموقَّع، سيتواصل معك فريق البرنامج بشأن الخطوات التالية.
+- Review and Sign Consent Form | مراجعة نموذج الموافقة والتوقيع عليه
+
+# 8. Consent Form Page
+# NOTE: The referral script asks only for e-mail, first name and last name. The consent form itself also has Date of Birth, Mobile Number, Gender, Residential Address, City, Medical Facility and Treating Physician. Those are not asked here. Say if they should be.
+
+[consent_form_page] message
+en: Achondroplasia Patient Support Program (VOXZOGO®) – Patient Consent Form
+
+Patient Details
+ar: برنامج دعم مرضى الأكوندروبلازيا (فوكسوغو®) – نموذج موافقة المريض
+
+بيانات المريض
+
+[consent_email] email
+save: consent_email
+en: Enter your email address.
+ar: أدخل بريدك الإلكتروني.
+
+[consent_first_name] text
+save: first_name
+en: Enter your first name.
+ar: أدخل اسمك الأول.
+
+[consent_last_name] text
+save: last_name
+en: Enter your last name.
+ar: أدخل اسم العائلة
+
+# The consent form (documents A and B), shown in full before signing.
+
+[consent_services] message
+en: **PATIENT CONSENT FORM**
+**ACHONDROPLASIA PATIENT SUPPORT PROGRAM**
+
+I hereby consent to MHCS Medical providing non-medical patient support services as part of Achondroplasia Patient Support Program, as described below.
+
+The Patient Support Program services may include the following:
+* **Disease and treatment education:** Providing education on Achondroplasia disease understanding, lifestyle modifications, self-management strategies, and Voxzogo® in accordance with the approved program scripts and protocols through a dedicated patient educator.
+* **Regular follow-up and treatment adherence support:** Including reminder calls, educational tips, and encouragement to continue treatment in line with the program schedule.
+* **Care coordination and support:** Including communication and coordination with the treating physician, hospital clinic, nursing staff, and pharmacy, where applicable, in relation to program activities.
+* **Functional follow-up and assessments:** Providing support for functional assessments upon the treating physician’s request to monitor disease progression.
+* **Access to trained patient support personnel** (such as call center staff or the program’s patient care coach) to provide program-related education and support.
+* **Patient awareness sessions,** where applicable, during or after hospital visits, delivered by trained program personnel without providing any medical advice or changing my prescribed treatment plan.
+ar: **نموذج موافقة المريض – برنامج دعم مرضى الأكوندروبلازيا (Achondroplasia)**
+
+أقرّ بموجب هذا بموافقتي على قيام شركة منزل لخدمات الرعاية الصحية (MHCS) بتقديم خدمات دعم غير طبية للمرضى ضمن برنامج دعم مرضى الأكوندروبلازيا (Achondroplasia)، وذلك وفقًا لما هو موضح أدناه.
+
+قد تشمل خدمات برنامج دعم المرضى ما يلي:
+* **التوعية والتثقيف حول المرض والعلاج:** تقديم التثقيف بشأن برنامج دعم مرضى الأكوندروبلازيا (Achondroplasia)، وفهم طبيعة المرض، وتعديلات نمط الحياة، واستراتيجيات الإدارة الذاتية، ودواء VOXZOGO®، وذلك وفقًا للنصوص والبروتوكولات المعتمدة للبرنامج ومن خلال مثقف مرضى مخصص.
+* **المتابعة المنتظمة ودعم الالتزام بالعلاج:** بما في ذلك مكالمات التذكير، والنصائح التثقيفية، والتشجيع على الاستمرار في العلاج، بما يتماشى مع جدول البرنامج.
+* **تنسيق الرعاية والدعم:** بما في ذلك التواصل والتنسيق مع الطبيب المعالج، وعيادة المستشفى، وطاقم التمريض، والصيدلية، حيثما ينطبق ذلك، فيما يتعلق بأنشطة البرنامج.
+* **المتابعة الوظيفية والتقييمات:** تقديم الدعم للتقييمات الوظيفية باستخدام أدوات قياسية لمرض الأكوندروبلازيا (Achondroplasia) بناءً على طلب الطبيب المعالج لمتابعة تطور المرض.
+* **إتاحة الوصول إلى كوادر مدربة لدعم المرضى:** مثل موظفي مركز الاتصال أو مدرب رعاية المرضى في البرنامج، لتقديم التثقيف والدعم المرتبطين بالبرنامج.
+* **جلسات توعية للمرضى:** تُقدَّم، حيثما ينطبق ذلك، أثناء زيارات المستشفى أو بعدها من قبل كوادر مدربة تابعة للبرنامج، دون تقديم أي مشورة طبية أو تغيير خطة العلاج الموصوفة لي.
+
+[consent_terms] message
+en: I understand that:
+* All services provided under this program are non-medical services, do not replace physician advice, and do not include diagnosis or treatment decisions.
+* My treatment plan remains solely the responsibility of the treating physician.
+* Participation in this program is free of charge.
+
+I hereby authorize the use and sharing of my relevant medical and personal information for the purposes of operating Achondroplasia Patient Support Program, including care coordination and program-related follow-up with relevant healthcare providers such as physicians, nurses, pharmacists, and program service providers, in accordance with applicable data privacy laws and program requirements.
+
+I agree to be contacted by MHCS Medical Company through the contact details I have provided (mobile number, SMS, WhatsApp, and email) in relation to patient support program activities.
+
+I understand that, where applicable, my personal data and/or de-identified or aggregated program data may be shared with BioMarin Pharmaceutical for the purposes of program administration, quality oversight, and reporting, in accordance with applicable data protection requirements
+
+I understand that my information will be recorded and stored securely in the program system and will only be used for program-related purposes, reporting, and quality monitoring.
+
+I acknowledge that participation in this program is voluntary, and that I have the right to withdraw or discontinue my participation at any time by cancelling this consent, without affecting my medical care.
+To cancel my consent, I may send a written, signed, and dated notice to MHCS Medical Company by email to:
+dm.management@mhcsmedical.com
+ar: أفهم أن:
+* جميع الخدمات المقدمة ضمن هذا البرنامج هي خدمات غير طبية، ولا تحل محل نصيحة الطبيب، ولا تشمل التشخيص أو اتخاذ قرارات العلاج.
+* تظل خطة علاجي تحت مسؤولية الطبيب المعالج فقط.
+* المشاركة في هذا البرنامج مجانية.
+
+أفوّض بموجب هذا استخدام وتبادل معلوماتي الطبية والشخصية ذات الصلة لأغراض تشغيل برنامج دعم مرضى الأكوندروبلازيا (Achondroplasia) بما في ذلك تنسيق الرعاية والمتابعة الخاصة بالبرنامج مع مقدمي الرعاية الصحية المعنيين، مثل الأطباء والممرضين والصيادلة ومقدمي خدمات البرنامج، وذلك وفقًا لقوانين خصوصية البيانات المعمول بها ومتطلبات البرنامج.
+
+أفهم أن معلوماتي سيتم تسجيلها وتخزينها بشكل آمن في نظام البرنامج، ولن تُستخدم إلا للأغراض المتعلقة بالبرنامج، وإعداد التقارير، ومراقبة الجودة.
+
+أقرّ بأن المشاركة في هذا البرنامج اختيارية، وأن لي الحق في سحب مشاركتي أو إيقافها في أي وقت من خلال إلغاء هذه الموافقة، دون أن يؤثر ذلك على رعايتي الطبية.
+لإلغاء موافقتي، يمكنني إرسال إخطار مكتوب وموقّع ومؤرخ إلى شركة MHCS Medical عبر البريد الإلكتروني على:
+dm.management@mhcsmedical.com
+
+أوافق على أن يتم التواصل معي من قبل شركة منزل لخدمات الرعاية الصحية (MHCS) من خلال بيانات الاتصال التي قمت بتقديمها، بما في ذلك رقم الجوال والرسائل النصية القصيرة وواتساب والبريد الإلكتروني، وذلك فيما يتعلق بأنشطة برنامج دعم المرضى.
+
+أفهم أنه، حيثما ينطبق ذلك، قد تتم مشاركة بياناتي الشخصية و/أو بيانات البرنامج غير المحددة للهوية أو المجمعة مع شركة BioMarin Pharmaceutical لأغراض إدارة البرنامج، والرقابة على الجودة، وإعداد التقارير، وذلك وفقًا لمتطلبات حماية البيانات المعمول بها.
+
+# NOTE: The documents have no signature pad wording for a chat. The two button labels below ("I agree and sign", "I do not agree") are the ones used in the live VOXZOGO bot, not text from the documents. Declining leads to the "Not now" message of section 6.
+
+[consent_signed] choice
+save: consent_signed
+en: I hereby acknowledge that I have read and understood this consent form and agree to all the terms and conditions stated above. By signing this form, I request enrollment in Achondroplasia Patient Support Program for myself or for the patient I represent. I confirm that I am 18 years of age or older, and if I am signing on behalf of the patient, I am the caregiver or authorized representative.
+ar: أقرّ بموجب هذا بأنني قرأت وفهمت نموذج الموافقة هذا، وأوافق على جميع الشروط والأحكام الواردة أعلاه. وبتوقيعي على هذا النموذج، أطلب التسجيل في برنامج دعم مرضى الأكوندروبلازيا (Achondroplasia) لنفسي أو بصفتي مقدم الرعاية/الممثل المفوض عن المريض. وأؤكد أنني أبلغ من العمر 18 عامًا أو أكثر، وإذا كنت أوقّع نيابةً عن المريض، فأنا مقدم الرعاية أو الممثل المفوض/الوصي القانوني.
+- I agree and sign | أوافق وأوقّع
+- I do not agree | لا أوافق -> not_now
+
+# NOTE: The form has three lines: Signature, Date and Printed Name. In the chat the visitor types the printed name as the signature, and the date is recorded automatically with the response.
+
+[printed_name] text
+save: printed_name
+en: Signature of Patient/Guardian
+Printed Name:
+ar: توقيع المريض/مقدم الرعاية أو الممثل المفوض
+الأسم:
+
+# 9. Final Confirmation Message
+
+[final_confirmation] end
+en: Thank you. Your signed consent form has been received. The program team will contact you regarding the next steps.
+
+For any questions or safety-related concerns, please contact us through the following channels:
+Email: a.shazly@mhcsmedical.com
+Hotline: +966 53 314 8139
+ar: شكرًا لك. تم استلام نموذج الموافقة الموقَّع، وسيتواصل معك فريق البرنامج بشأن الخطوات التالية.
+
+لأي استفسارات أو ملاحظات تتعلق بالسلامة، يرجى التواصل معنا من خلال القنوات التالية:
+البريد الإلكتروني: a.shazly@mhcsmedical.com
+الخط الساخن: +966 53 314 8139

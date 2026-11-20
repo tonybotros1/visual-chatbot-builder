@@ -195,6 +195,37 @@ def test_reader_is_forgiving_about_how_the_code_was_pasted() -> None:
     assert compile_script("just some words")["ok"] is False
 
 
+def test_notes_from_the_author_are_shown_to_the_owner() -> None:
+    source = "languages: en\n\n# just a comment\n# NOTE: The document gives no hotline number.\n[bye] end\ntext: Bye\n"
+    result = compile_script(source)
+    assert result["ok"]
+    notes = [issue for issue in result["issues"] if issue["severity"] == "warning"]
+    assert len(notes) == 1 and notes[0]["line"] == 4 and notes[0]["step"] == "bye"
+    assert notes[0]["message"] == "Note from the code's author: The document gives no hotline number."
+
+
+def test_the_rules_keep_the_code_faithful_to_the_document() -> None:
+    assert "STAY FAITHFUL TO THE DOCUMENT" in RULES
+    assert "Every field is" in RULES and "required unless the document says it is optional" in RULES.replace("\n     ", " ")
+    assert "# NOTE:" in RULES
+
+
+def test_voxzogo_patient_script_builds_as_the_document_says() -> None:
+    result = compile_script((FIXTURES / "voxzogo_patient.botscript").read_text(encoding="utf-8"))
+    assert result["ok"], result["issues"]
+    assert [issue for issue in result["issues"] if issue["severity"] == "error"] == []
+    notes = [issue for issue in result["issues"] if issue["message"].startswith("Note from the code's author")]
+    assert {note["step"] for note in notes} == {"contact_confirmation", "consent_form_page", "consent_signed", "printed_name"}
+    nodes = {node["id"]: node for node in result["flow"]["nodes"]}
+    # Nothing the document does not have: no upload, no invented "continue" questions.
+    assert not any(node["type"] == "fileUpload" for node in nodes.values())
+    # Only the e-mail "if available" is optional.
+    optional = sorted(node_id for node_id, node in nodes.items() if node["data"].get("required") is False)
+    assert optional == ["contact_email__ar", "contact_email__en"]
+    # The Arabic keeps its vowel marks.
+    assert "مرحبًا" in str(nodes["welcome"]["data"])
+
+
 def test_text_markup_round_trip() -> None:
     text = "First line\nSecond line\n\nNew paragraph\n* one\n* two"
     markup = text_to_markup(text)

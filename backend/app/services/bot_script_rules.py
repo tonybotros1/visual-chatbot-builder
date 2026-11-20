@@ -119,7 +119,9 @@ with no explanation before or after it.
 
    - The name is yours to choose: letters, digits and underscores, no spaces, different for every step.
    - After a step, the bot continues with the NEXT STEP IN THE FILE, unless an arrow sends it elsewhere.
-   - Leave an empty line between steps. Lines starting with # are notes and are ignored.
+   - Leave an empty line between steps. Lines starting with # are comments and are ignored.
+   - A line starting with "# NOTE:" is shown to the bot's owner when the code is checked. Use it to
+     report anything the document leaves open (see rule 13).
 
 3. TEXT
    Every step that shows something needs its text in every language, one line per language:
@@ -131,7 +133,8 @@ with no explanation before or after it.
    - A line starting with "* " is a bullet point.
    - {{name}} shows an earlier answer, where "name" is what an earlier step wrote after "save:".
    - With one language you may write "text:" instead of "en:" or "ar:".
-   - Keep the full wording of the source document. Do not shorten or rephrase it.
+   - Copy the wording of the source document exactly, in every language. Do not shorten, rephrase,
+     translate or "improve" it, and keep Arabic vowel marks (tashkeel) as they are written.
 
 4. STEP TYPES
    message     shows text, asks nothing
@@ -158,7 +161,9 @@ with no explanation before or after it.
    save: full_name
 
    Use lowercase letters, digits and underscores. If "save:" is missing, the step name is used.
-   A question is required unless you add:  required: no
+   A question must be answered unless you add:  required: no
+   Add "required: no" ONLY when the document itself says the answer is optional (for example
+   "if available" or "optional"). When in doubt, leave the question required.
 
 6. OPTIONS (choice and multi)
    One line per option, starting with "- ". Write the label once per language, separated by "|",
@@ -207,12 +212,30 @@ with no explanation before or after it.
 
 12. TURNING A DOCUMENT INTO CODE
    - A heading or paragraph the visitor only reads becomes a message.
-   - A field the visitor fills in becomes text, number, email, phone or date. A field marked * is
-     required; one without * gets "required: no".
+   - A field the visitor fills in becomes text, number, email, phone or date. Every field is
+     required unless the document says it is optional ("if available", "optional"). If the document
+     marks required fields with *, then the fields without * are the optional ones.
    - A list of buttons becomes a choice. Each branch of the document becomes its own group of steps,
      reached with an arrow, and ends with an end step or an arrow back to the shared path.
+   - A paragraph followed by one button is ONE choice step: the paragraph is its text and the button
+     is its only option.
+   - A lone "Continue", "Next" or "Submit" button after a group of fields is left out. In a chat,
+     sending the last answer already continues.
    - "Auto-populated" values are shown with {{...}} inside the text; do not ask for them again.
    - There is no signature pad: ask the visitor to type their full name in a text step.
+
+13. STAY FAITHFUL TO THE DOCUMENT
+   The document is an approved script. The code must say what the document says and nothing else.
+   - Never add a step the document does not have (no extra questions, uploads, confirmations).
+   - Never write visitor-facing text that is not in the document. If a step needs text and the
+     document gives none, use the document's own heading or button label for it.
+   - Never fill in a blank. If the document says "insert e-mail here", points to a form, page or
+     link it does not contain, or leaves a number empty, do not guess and do not copy a value from
+     another section.
+   - Report every such gap, and every place where you had to decide something the document does not
+     say, on its own line directly above the step it concerns:
+
+     # NOTE: The document does not include the consent form text. This step shows only its title.
 
 COMPLETE EXAMPLE
 ================

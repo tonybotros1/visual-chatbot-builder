@@ -86,6 +86,7 @@ _OPTION_RE = re.compile(r"^-\s+(.*)$")
 _ROUTE_RE = re.compile(rf"^({'|'.join(sorted(ROUTE_KEYS))})\s*{_ARROW}\s*(\S+)\s*$", re.I)
 _ARROW_RE = re.compile(rf"^{_ARROW}\s*(\S+)\s*$")
 _KEY_RE = re.compile(r"^([A-Za-z_]{2,12})\s*:\s?(.*)$")
+_NOTE_RE = re.compile(r"^#+\s*NOTE\b\s*[:\-–]?\s*(.*)$", re.I)
 _ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 _VARIABLE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _LANG_RE = re.compile(r"^[a-z]{2,3}$")
@@ -202,6 +203,7 @@ def parse_script(source: str) -> Script:
     text_lang: str | None = None  # the language whose text block is open, if any
     pending_blank = 0
     seen_ids: dict[str, int] = {}
+    open_notes: list[Issue] = []  # "# NOTE:" lines belong to the step that follows them
 
     for number, raw in enumerate(cleaned, start=1):
         line = raw.strip()
@@ -212,6 +214,10 @@ def parse_script(source: str) -> Script:
                 pending_blank += 1
             continue
         if line.startswith("#"):
+            note = _NOTE_RE.match(line)
+            if note and note.group(1).strip():
+                script.warn(f"Note from the code's author: {note.group(1).strip()}", number, current.id if current else None)
+                open_notes.append(script.issues[-1])
             continue
 
         header = _HEADER_RE.match(line)
@@ -232,6 +238,9 @@ def parse_script(source: str) -> Script:
                 seen_ids[step_id] = number
             current = Step(id=step_id, kind=kind, line=number, broken=broken)
             script.steps.append(current)
+            for pending in open_notes:
+                pending.step = step_id
+            open_notes = []
             text_lang, pending_blank = None, 0
             continue
 
